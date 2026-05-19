@@ -5,6 +5,8 @@
 node_modules/
 dist/
 .vite/
+.svelte-kit/
+build/
 
 # Rust / Tauri
 src-tauri/target/
@@ -20,3 +22,8 @@ src-tauri/Cargo.lock.bak
 *.db-journal
 *.db-wal
 *.db-shm
+
+# Env
+.env
+.env.*
+!.env.example
