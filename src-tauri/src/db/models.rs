@@ -22,6 +22,25 @@ pub struct NewJob {
     pub is_template: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Phase {
+    pub id: i64,
+    pub job_id: i64,
+    pub name: String,
+    pub colour: String,        // hex e.g. "#3B82F6"
+    pub order_index: i64,
+    pub collapsed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewPhase {
+    pub job_id: i64,
+    pub name: String,
+    pub colour: String,
+    pub order_index: i64,
+    pub collapsed: bool,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -42,5 +61,16 @@ mod tests {
         let s = serde_json::to_string(&job).unwrap();
         let back: Job = serde_json::from_str(&s).unwrap();
         assert_eq!(job, back);
+    }
+
+    #[test]
+    fn phase_serializes_to_json() {
+        let p = Phase {
+            id: 1, job_id: 1, name: "Plumbing".into(),
+            colour: "#3B82F6".into(), order_index: 0, collapsed: true,
+        };
+        let s = serde_json::to_string(&p).unwrap();
+        let back: Phase = serde_json::from_str(&s).unwrap();
+        assert_eq!(p, back);
     }
 }
