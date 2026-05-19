@@ -37,6 +37,17 @@ pub fn sa_holidays(year: i32) -> Vec<Holiday> {
     out
 }
 
+pub fn sa_holidays_for_range(from: NaiveDate, to: NaiveDate) -> Vec<Holiday> {
+    if to < from { return vec![]; }
+    let mut out = Vec::new();
+    for y in from.year()..=to.year() {
+        for h in sa_holidays(y) {
+            if h.date >= from && h.date <= to { out.push(h); }
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -72,6 +83,19 @@ mod tests {
         // Easter Sun 2026 = 5 April; Good Friday = 3 April; Family Day = 6 April
         assert!(h.contains(&(NaiveDate::from_ymd_opt(2026,4,3).unwrap(), "Good Friday")));
         assert!(h.contains(&(NaiveDate::from_ymd_opt(2026,4,6).unwrap(), "Family Day")));
+    }
+
+    #[test]
+    fn range_spanning_year_boundary_returns_holidays_from_both_years() {
+        let from = NaiveDate::from_ymd_opt(2026, 11, 1).unwrap();
+        let to   = NaiveDate::from_ymd_opt(2027, 2, 1).unwrap();
+        let h = sa_holidays_for_range(from, to);
+        let dates: Vec<NaiveDate> = h.iter().map(|x| x.date).collect();
+        assert!(dates.contains(&NaiveDate::from_ymd_opt(2026, 12, 16).unwrap()));
+        assert!(dates.contains(&NaiveDate::from_ymd_opt(2026, 12, 25).unwrap()));
+        assert!(dates.contains(&NaiveDate::from_ymd_opt(2026, 12, 26).unwrap()));
+        assert!(dates.contains(&NaiveDate::from_ymd_opt(2027, 1, 1).unwrap()));
+        assert!(h.iter().all(|h| h.date >= from && h.date <= to));
     }
 
     #[test]
