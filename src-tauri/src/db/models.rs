@@ -62,6 +62,22 @@ pub struct NewTask {
     pub notes: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Dependency {
+    pub id: i64,
+    pub predecessor_id: i64,
+    pub successor_id: i64,
+    pub r#type: String,    // 'FS' for v1
+    pub lag_days: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewDependency {
+    pub predecessor_id: i64,
+    pub successor_id: i64,
+    pub lag_days: i64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -105,5 +121,13 @@ mod tests {
         let s = serde_json::to_string(&t).unwrap();
         let back: Task = serde_json::from_str(&s).unwrap();
         assert_eq!(t, back);
+    }
+
+    #[test]
+    fn dependency_serializes_to_json() {
+        let d = Dependency { id: 1, predecessor_id: 1, successor_id: 2, r#type: "FS".into(), lag_days: 0 };
+        let s = serde_json::to_string(&d).unwrap();
+        let back: Dependency = serde_json::from_str(&s).unwrap();
+        assert_eq!(d, back);
     }
 }
