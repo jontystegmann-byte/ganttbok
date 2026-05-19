@@ -78,6 +78,23 @@ pub struct NewDependency {
     pub lag_days: i64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct NoWorkDay {
+    pub id: i64,
+    pub job_id: i64,
+    pub date: NaiveDate,
+    pub reason: String,
+    pub source: String,   // 'sa_public_holiday' | 'manual'
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewNoWorkDay {
+    pub job_id: i64,
+    pub date: NaiveDate,
+    pub reason: String,
+    pub source: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -129,5 +146,18 @@ mod tests {
         let s = serde_json::to_string(&d).unwrap();
         let back: Dependency = serde_json::from_str(&s).unwrap();
         assert_eq!(d, back);
+    }
+
+    #[test]
+    fn no_work_day_serializes_to_json() {
+        let n = NoWorkDay {
+            id: 1, job_id: 1,
+            date: NaiveDate::from_ymd_opt(2026, 6, 16).unwrap(),
+            reason: "Youth Day".into(),
+            source: "sa_public_holiday".into(),
+        };
+        let s = serde_json::to_string(&n).unwrap();
+        let back: NoWorkDay = serde_json::from_str(&s).unwrap();
+        assert_eq!(n, back);
     }
 }
