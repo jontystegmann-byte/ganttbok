@@ -95,6 +95,24 @@ pub struct NewNoWorkDay {
     pub source: String,
 }
 
+use rusqlite::Connection;
+
+pub fn meta_get(conn: &Connection, key: &str) -> crate::GbResult<Option<String>> {
+    let res = conn
+        .query_row("SELECT value FROM app_meta WHERE key = ?1", [key], |r| r.get::<_, String>(0))
+        .ok();
+    Ok(res)
+}
+
+pub fn meta_set(conn: &Connection, key: &str, value: &str) -> crate::GbResult<()> {
+    conn.execute(
+        "INSERT INTO app_meta (key, value) VALUES (?1, ?2)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        rusqlite::params![key, value],
+    )?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -159,5 +177,15 @@ mod tests {
         let s = serde_json::to_string(&n).unwrap();
         let back: NoWorkDay = serde_json::from_str(&s).unwrap();
         assert_eq!(n, back);
+    }
+
+    #[test]
+    fn meta_get_set_roundtrip() {
+        let conn = crate::db::connection::open_in_memory().unwrap();
+        assert!(meta_get(&conn, "last_open_job_id").unwrap().is_none());
+        meta_set(&conn, "last_open_job_id", "42").unwrap();
+        assert_eq!(meta_get(&conn, "last_open_job_id").unwrap(), Some("42".into()));
+        meta_set(&conn, "last_open_job_id", "43").unwrap();
+        assert_eq!(meta_get(&conn, "last_open_job_id").unwrap(), Some("43".into()));
     }
 }
