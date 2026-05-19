@@ -41,6 +41,27 @@ pub struct NewPhase {
     pub collapsed: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Task {
+    pub id: i64,
+    pub phase_id: i64,
+    pub name: String,
+    pub start_date: NaiveDate,
+    pub duration_workdays: i64,
+    pub order_index: i64,
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewTask {
+    pub phase_id: i64,
+    pub name: String,
+    pub start_date: NaiveDate,
+    pub duration_workdays: i64,
+    pub order_index: i64,
+    pub notes: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -72,5 +93,17 @@ mod tests {
         let s = serde_json::to_string(&p).unwrap();
         let back: Phase = serde_json::from_str(&s).unwrap();
         assert_eq!(p, back);
+    }
+
+    #[test]
+    fn task_serializes_to_json() {
+        let t = Task {
+            id: 1, phase_id: 1, name: "First-fix".into(),
+            start_date: NaiveDate::from_ymd_opt(2026, 6, 8).unwrap(),
+            duration_workdays: 3, order_index: 0, notes: None,
+        };
+        let s = serde_json::to_string(&t).unwrap();
+        let back: Task = serde_json::from_str(&s).unwrap();
+        assert_eq!(t, back);
     }
 }
