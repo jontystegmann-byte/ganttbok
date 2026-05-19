@@ -41,6 +41,27 @@ pub fn is_workday(d: NaiveDate) -> bool {
     !matches!(d.weekday(), Weekday::Sat | Weekday::Sun)
 }
 
+use std::collections::HashSet;
+
+pub fn add_workdays_excluding(
+    from: NaiveDate,
+    n: i64,
+    excluded: &HashSet<NaiveDate>,
+) -> NaiveDate {
+    let is_work = |d: NaiveDate| is_workday(d) && !excluded.contains(&d);
+    let mut cur = from;
+    while !is_work(cur) {
+        cur += Duration::days(1);
+    }
+    if n <= 0 { return cur; }
+    let mut remaining = n;
+    while remaining > 0 {
+        cur += Duration::days(1);
+        if is_work(cur) { remaining -= 1; }
+    }
+    cur
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -82,5 +103,19 @@ mod tests {
     #[test]
     fn count_workdays_reverse_returns_zero() {
         assert_eq!(count_workdays(d(2026, 6, 15), d(2026, 6, 8)), 0);
+    }
+
+    #[test]
+    fn add_workdays_excluding_skips_holiday_in_path() {
+        use std::collections::HashSet;
+        let mut hol = HashSet::new();
+        hol.insert(NaiveDate::from_ymd_opt(2026,6,16).unwrap()); // Youth Day, Tue
+        // Mon 15 Jun + 3 workdays = Thu 18 Jun normally; with Tue blocked → Fri 19 Jun
+        let result = add_workdays_excluding(
+            NaiveDate::from_ymd_opt(2026,6,15).unwrap(),
+            3,
+            &hol,
+        );
+        assert_eq!(result, NaiveDate::from_ymd_opt(2026,6,19).unwrap());
     }
 }
