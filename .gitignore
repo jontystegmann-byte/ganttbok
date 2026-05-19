@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/Cargo.lock.bak
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Local data (runtime DB never lives in repo)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
