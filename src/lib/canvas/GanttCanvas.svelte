@@ -4,6 +4,7 @@
   import LeftRail from './LeftRail.svelte';
   import NoWorkColumn from './NoWorkColumn.svelte';
   import TaskBar from './TaskBar.svelte';
+  import PhaseBar from './PhaseBar.svelte';
   import { computeViewportDays } from '../calendar';
   import type { Phase, Task } from '../types';
 
@@ -50,7 +51,9 @@
         onclick={() => state.select(null)}
       >
         {#each rows as r, ri (r.kind === 'phase' ? `p${r.phase.id}` : `t${r.task.id}`)}
-          {#if r.kind === 'task'}
+          {#if r.kind === 'phase' && r.phase.collapsed}
+            <PhaseBar phase={r.phase} tasks={state.tasksByPhase.get(r.phase.id) ?? []} {days} row={ri} />
+          {:else if r.kind === 'task'}
             <TaskBar task={r.task} phase={r.phase} {days} row={ri} />
           {/if}
         {/each}
