@@ -1,5 +1,15 @@
 import * as ipc from './ipc';
 import type { Job, Phase, Task, Dependency, NoWorkDay } from './types';
+import type { Zone } from './hit-test';
+
+export interface DragState {
+  taskId: number;
+  zone: Zone;
+  startX: number;
+  originalStart: string;
+  originalDuration: number;
+  liveDelta: number;
+}
 
 export type Selection =
   | { kind: 'task'; id: number }
@@ -23,6 +33,11 @@ class Store {
   showNewJobModal = $state<boolean>(false);
   archivedJobs = $state<Job[]>([]);
   hoveredTaskId = $state<number | null>(null);
+  dragState     = $state<DragState | null>(null);
+
+  cancelDrag(): void {
+    this.dragState = null;
+  }
 
   async refreshArchived(): Promise<void> {
     // Backend doesn't have a list_archived command; fetch all by toggling and use a generic.

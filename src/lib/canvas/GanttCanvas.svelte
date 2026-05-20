@@ -6,6 +6,7 @@
   import TaskBar from './TaskBar.svelte';
   import PhaseBar from './PhaseBar.svelte';
   import DependencyArrow from './DependencyArrow.svelte';
+  import DragOverlay from './DragOverlay.svelte';
   import { computeViewportDays } from '../calendar';
   import type { Phase, Task } from '../types';
 
@@ -46,6 +47,7 @@
 </script>
 
 <div class="gantt" style="--cell-w: {CELL}px;">
+  <DragOverlay />
   <LeftRail />
   <div class="grid-area" style="--total-w: {days.length * CELL}px;">
     <HeaderStrip {days} />
