@@ -1,0 +1,54 @@
+<script lang="ts">
+  import { state } from '../store.svelte';
+  import * as ipc from '../ipc';
+  import type { Phase } from '../types';
+
+  let { phaseId }: { phaseId: number } = $props();
+  const phase = $derived(state.phases.find(p => p.id === phaseId));
+
+  let name = $state('');
+  let colour = $state('#3B82F6');
+
+  $effect(() => {
+    if (phase) {
+      name = phase.name;
+      colour = phase.colour;
+    }
+  });
+
+  async function save() {
+    if (!phase) return;
+    const updated: Phase = { ...phase, name: name.trim() || phase.name, colour };
+    await ipc.updatePhase($state.snapshot(updated));
+    state.phases = state.phases.map(p => p.id === updated.id ? updated : p);
+    await ipc.touchLastSave();
+  }
+
+  async function del() {
+    if (!phase) return;
+    if (!confirm(`Delete phase "${phase.name}" and ALL its tasks?`)) return;
+    await ipc.deletePhase(phase.id);
+    state.phases = state.phases.filter(p => p.id !== phase.id);
+    state.tasks  = state.tasks.filter(t => t.phase_id !== phase.id);
+    state.select(null);
+    await ipc.touchLastSave();
+  }
+</script>
+
+{#if phase}
+  <div class="phase-details">
+    <h2>{phase.name}</h2>
+    <label>Name<input bind:value={name} onblur={save} /></label>
+    <label>Colour<input type="color" bind:value={colour} onblur={save} /></label>
+    <button class="danger" onclick={del}>Delete phase</button>
+  </div>
+{/if}
+
+<style>
+  .phase-details { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4); }
+  h2 { font-size: var(--font-size-lg); margin: 0; }
+  label { display: flex; flex-direction: column; gap: var(--sp-1); font-size: var(--font-size-sm); color: var(--c-text-muted); }
+  input { padding: var(--sp-2); border: 1px solid var(--c-border); border-radius: 4px; font: inherit; color: var(--c-text); background: var(--c-bg); }
+  .danger { margin-top: var(--sp-3); padding: var(--sp-2); background: transparent; border: 1px solid #DC2626; color: #DC2626; border-radius: 4px; cursor: pointer; }
+  .danger:hover { background: #FEE2E2; }
+</style>
