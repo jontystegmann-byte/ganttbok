@@ -1,6 +1,7 @@
 import * as ipc from './ipc';
 import type { Job, Phase, Task, Dependency, NoWorkDay } from './types';
 import type { Zone } from './hit-test';
+import { UndoStack, type Snapshot as UndoSnapshot } from './undo';
 
 export interface DragState {
   taskId: number;
@@ -35,8 +36,64 @@ class Store {
   hoveredTaskId = $state<number | null>(null);
   dragState     = $state<DragState | null>(null);
 
+  private undoStack = new UndoStack();
+  hasUnsavedUndo = $state<boolean>(false);
+  private resyncTimer: number | null = null;
+
   cancelDrag(): void {
     this.dragState = null;
+  }
+
+  /** Snapshot current job state into the undo stack. Called after every mutation. */
+  recordHistory(): void {
+    this.undoStack.push({
+      phases: $state.snapshot(this.phases),
+      tasks: $state.snapshot(this.tasks),
+      dependencies: $state.snapshot(this.dependencies),
+      noWorkDays: $state.snapshot(this.noWorkDays),
+      selection: $state.snapshot(this.selection),
+    });
+  }
+
+  canUndo(): boolean { return this.undoStack.canUndo(); }
+  canRedo(): boolean { return this.undoStack.canRedo(); }
+
+  undo(): void {
+    const snap = this.undoStack.undo();
+    if (snap) { this.applySnapshot(snap); this.scheduleResync(); }
+  }
+
+  redo(): void {
+    const snap = this.undoStack.redo();
+    if (snap) { this.applySnapshot(snap); this.scheduleResync(); }
+  }
+
+  private applySnapshot(snap: UndoSnapshot): void {
+    this.phases       = snap.phases;
+    this.tasks        = snap.tasks;
+    this.dependencies = snap.dependencies;
+    this.noWorkDays   = snap.noWorkDays;
+    this.selection    = snap.selection;
+    this.hasUnsavedUndo = true;
+  }
+
+  private scheduleResync(): void {
+    if (this.resyncTimer !== null) clearTimeout(this.resyncTimer);
+    this.resyncTimer = window.setTimeout(() => {
+      this.resyncTimer = null;
+      void this.resyncJobState();
+    }, 300);
+  }
+
+  async resyncJobState(): Promise<void> {
+    // Task 3 implements the real backend resync. Stub for Task 2.
+    this.hasUnsavedUndo = false;
+  }
+
+  mutateAndRecord<T>(fn: () => T): T {
+    const result = fn();
+    this.recordHistory();
+    return result;
   }
 
   async refreshArchived(): Promise<void> {
@@ -50,6 +107,7 @@ class Store {
     const job = await ipc.createJob({ ...args, is_template: false });
     await this.refreshSidebar();
     await this.openJob(job.id);
+    await ipc.touchLastSave();
     this.showNewJobModal = false;
   }
 
@@ -100,6 +158,9 @@ class Store {
     this.noWorkDays   = await ipc.listNoWorkDays(jobId);
     this.selection    = null;
     await ipc.setLastOpenJob(jobId);
+    this.undoStack.clear();
+    this.recordHistory(); // seed
+    this.hasUnsavedUndo = false;
   }
 
   select(s: Selection): void {
@@ -110,6 +171,8 @@ class Store {
     await ipc.reorderTasks(phaseId, orderedIds);
     const idx = new Map(orderedIds.map((id, i) => [id, i]));
     this.tasks = this.tasks.map(t => t.phase_id === phaseId ? { ...t, order_index: idx.get(t.id) ?? t.order_index } : t);
+    await ipc.touchLastSave();
+    this.recordHistory();
   }
 
   async reorderPhases(orderedIds: number[]): Promise<void> {
@@ -118,6 +181,8 @@ class Store {
     const idx = new Map(orderedIds.map((id, i) => [id, i]));
     this.phases = this.phases.map(p => ({ ...p, order_index: idx.get(p.id) ?? p.order_index }))
                               .sort((a, b) => a.order_index - b.order_index);
+    await ipc.touchLastSave();
+    this.recordHistory();
   }
 
   async createPhase(name: string): Promise<void> {
@@ -128,6 +193,8 @@ class Store {
     // Newly-created phases come back expanded (collapsed=false from the IPC command).
     this.phases = [...this.phases, phase].sort((a, b) => a.order_index - b.order_index);
     this.selection = { kind: 'phase', id: phase.id };
+    await ipc.touchLastSave();
+    this.recordHistory();
   }
 
   async createTaskInPhase(phaseId: number, name: string): Promise<void> {
@@ -138,12 +205,15 @@ class Store {
     });
     this.tasks = [...this.tasks, task];
     this.selection = { kind: 'task', id: task.id };
+    await ipc.touchLastSave();
+    this.recordHistory();
   }
 
   // Optimistic local update applied after an IPC mutation returns updated rows.
   applyDragResult(updated: Task[]): void {
     const byId = new Map(updated.map(t => [t.id, t]));
     this.tasks = this.tasks.map(t => byId.get(t.id) ?? t);
+    this.recordHistory();
   }
 }
 
