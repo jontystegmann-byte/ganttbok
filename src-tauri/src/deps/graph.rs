@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 use crate::db::models::Dependency;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -19,11 +20,64 @@ pub fn build_adjacency(deps: &[Dependency]) -> HashMap<i64, Vec<Edge>> {
     m
 }
 
+/// Returns true iff adding (pre -> suc) would create a cycle in the existing adjacency.
+pub fn would_cycle(adj: &HashMap<i64, Vec<Edge>>, pre: i64, suc: i64) -> bool {
+    if pre == suc { return true; }
+    let mut stack = vec![suc];
+    let mut visited: HashSet<i64> = HashSet::new();
+    while let Some(node) = stack.pop() {
+        if !visited.insert(node) { continue; }
+        if let Some(edges) = adj.get(&node) {
+            for e in edges {
+                if e.successor_id == pre { return true; }
+                stack.push(e.successor_id);
+            }
+        }
+    }
+    false
+}
+
+#[cfg(test)]
+mod cycle_tests {
+    use super::*;
+    use super::tests::*;  // reuse the dep() helper above
+
+    #[test]
+    fn self_loop_is_a_cycle() {
+        let adj = build_adjacency(&[]);
+        assert!(would_cycle(&adj, 10, 10));
+    }
+
+    #[test]
+    fn direct_back_edge_is_a_cycle() {
+        // existing: 10 -> 20.  Adding 20 -> 10 closes the loop.
+        let adj = build_adjacency(&[dep(1, 10, 20, 0)]);
+        assert!(would_cycle(&adj, 20, 10));
+    }
+
+    #[test]
+    fn deeper_back_edge_is_a_cycle() {
+        // existing: 10 -> 20 -> 30 -> 40.  Adding 40 -> 10 closes.
+        let adj = build_adjacency(&[
+            dep(1, 10, 20, 0),
+            dep(2, 20, 30, 0),
+            dep(3, 30, 40, 0),
+        ]);
+        assert!(would_cycle(&adj, 40, 10));
+    }
+
+    #[test]
+    fn unrelated_edge_does_not_cycle() {
+        let adj = build_adjacency(&[dep(1, 10, 20, 0)]);
+        assert!(!would_cycle(&adj, 30, 40));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn dep(id: i64, pre: i64, suc: i64, lag: i64) -> Dependency {
+    pub(super) fn dep(id: i64, pre: i64, suc: i64, lag: i64) -> Dependency {
         Dependency { id, predecessor_id: pre, successor_id: suc, r#type: "FS".into(), lag_days: lag }
     }
 
