@@ -53,6 +53,11 @@ pub fn run() {
             commands::no_work_day::add_manual_no_work_day,
             commands::no_work_day::delete_no_work_day,
             commands::no_work_day::sync_sa_holidays,
+            commands::meta::startup_info,
+            commands::meta::mark_clean_shutdown,
+            commands::meta::set_last_open_job,
+            commands::meta::set_sidebar_width,
+            commands::meta::touch_last_save,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
