@@ -12,7 +12,21 @@
 
 <div class="left-rail">
   {#each state.phases as phase, pi (phase.id)}
-    <div class="phase-row" style="height: var(--row-height);">
+    <div class="phase-row"
+      style="height: var(--row-height);"
+      draggable="true"
+      ondragstart={(e) => e.dataTransfer!.setData('text/phase-id', String(phase.id))}
+      ondragover={(e) => e.preventDefault()}
+      ondrop={async (e) => {
+        e.preventDefault();
+        const draggedId = Number(e.dataTransfer!.getData('text/phase-id'));
+        if (!draggedId || draggedId === phase.id) return;
+        const ordered = state.phases.map(p => p.id).filter(id => id !== draggedId);
+        const targetIdx = state.phases.findIndex(p => p.id === phase.id);
+        ordered.splice(targetIdx, 0, draggedId);
+        await state.reorderPhases(ordered);
+      }}
+    >
       <button class="chev" onclick={() => toggleCollapse(phase.id)} aria-label="toggle">
         {phase.collapsed ? '▸' : '▾'}
       </button>
