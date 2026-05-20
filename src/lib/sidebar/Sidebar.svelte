@@ -1,11 +1,11 @@
 <script lang="ts">
   import { state } from '../store.svelte';
   import JobItem from './JobItem.svelte';
+  import NewJobModal from './NewJobModal.svelte';
 </script>
 
 <div class="sidebar">
   <header><h2>Gantt Bok</h2></header>
-
   <section>
     <h3>Active</h3>
     {#each state.jobs as job (job.id)}
@@ -14,11 +14,14 @@
       <p class="hint">No jobs yet</p>
     {/each}
   </section>
-
   <footer>
-    <button class="new-job">+ New job</button>
+    <button class="new-job" onclick={() => state.showNewJobModal = true}>+ New job</button>
   </footer>
 </div>
+
+{#if state.showNewJobModal}
+  <NewJobModal />
+{/if}
 
 <style>
   .sidebar { display: flex; flex-direction: column; height: 100%; }

@@ -20,6 +20,14 @@ class Store {
 
   selection     = $state<Selection>(null);
   sidebarWidth  = $state<number>(240);
+  showNewJobModal = $state<boolean>(false);
+
+  async createJob(args: { name: string; client: string | null; address: string | null; project_start_date: string; }): Promise<void> {
+    const job = await ipc.createJob({ ...args, is_template: false });
+    await this.refreshSidebar();
+    await this.openJob(job.id);
+    this.showNewJobModal = false;
+  }
 
   // Derived helpers
   tasksByPhase = $derived.by(() => {
