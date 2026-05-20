@@ -3,6 +3,7 @@
   import JobItem from './JobItem.svelte';
   import NewJobModal from './NewJobModal.svelte';
   import ArchivedGroup from './ArchivedGroup.svelte';
+  import TemplatesGroup from './TemplatesGroup.svelte';
 </script>
 
 <div class="sidebar">
@@ -15,6 +16,7 @@
       <p class="hint">No jobs yet</p>
     {/each}
   </section>
+  <TemplatesGroup />
   <ArchivedGroup />
   <footer>
     <button class="new-job" onclick={() => store.showNewJobModal = true}>+ New job</button>
