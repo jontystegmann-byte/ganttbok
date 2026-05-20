@@ -1,0 +1,54 @@
+<script lang="ts">
+  import { state } from '../store.svelte';
+  import * as ipc from '../ipc';
+
+  async function toggleCollapse(phaseId: number) {
+    const phase = state.phases.find(p => p.id === phaseId);
+    if (!phase) return;
+    phase.collapsed = !phase.collapsed;
+    await ipc.updatePhase($state.snapshot(phase));
+  }
+</script>
+
+<div class="left-rail">
+  {#each state.phases as phase, pi (phase.id)}
+    <div class="phase-row" style="height: var(--row-height);">
+      <button class="chev" onclick={() => toggleCollapse(phase.id)} aria-label="toggle">
+        {phase.collapsed ? '▸' : '▾'}
+      </button>
+      <span class="num">{pi + 1}.</span>
+      <span class="name">{phase.name}</span>
+    </div>
+    {#if !phase.collapsed}
+      {#each (state.tasksByPhase.get(phase.id) ?? []) as task, ti (task.id)}
+        <div class="task-row" style="height: var(--row-height);">
+          <span class="num">{pi + 1}.{ti + 1}</span>
+          <span class="name">{task.name}</span>
+        </div>
+      {/each}
+    {/if}
+  {/each}
+</div>
+
+<style>
+  .left-rail {
+    width: var(--left-rail-width);
+    border-right: 1px solid var(--c-border);
+    background: var(--c-panel);
+    overflow-y: auto;
+  }
+  .phase-row, .task-row {
+    display: flex; align-items: center; gap: var(--sp-2);
+    padding: 0 var(--sp-2);
+    border-bottom: 1px solid var(--c-border);
+    font-size: var(--font-size-sm);
+  }
+  .task-row { padding-left: calc(var(--sp-2) * 4); color: var(--c-text-muted); }
+  .chev {
+    background: transparent; border: none; cursor: pointer;
+    font-size: 10px; color: var(--c-text-muted);
+    padding: 0; width: 14px;
+  }
+  .num { font-variant-numeric: tabular-nums; color: var(--c-text-muted); min-width: 28px; }
+  .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+</style>
