@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::collections::VecDeque;
 use crate::db::models::Dependency;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -35,6 +36,64 @@ pub fn would_cycle(adj: &HashMap<i64, Vec<Edge>>, pre: i64, suc: i64) -> bool {
         }
     }
     false
+}
+
+/// Tasks transitively reachable from `root`, in BFS-by-depth order.
+/// `root` itself is NOT included.
+pub fn downstream(adj: &HashMap<i64, Vec<Edge>>, root: i64) -> Vec<i64> {
+    let mut out = Vec::new();
+    let mut seen: HashSet<i64> = HashSet::new();
+    let mut q: VecDeque<i64> = VecDeque::new();
+    q.push_back(root);
+    while let Some(node) = q.pop_front() {
+        if let Some(edges) = adj.get(&node) {
+            for e in edges {
+                if seen.insert(e.successor_id) {
+                    out.push(e.successor_id);
+                    q.push_back(e.successor_id);
+                }
+            }
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod downstream_tests {
+    use super::*;
+    use super::tests::*;
+
+    #[test]
+    fn no_outgoing_returns_empty() {
+        let adj = build_adjacency(&[]);
+        assert!(downstream(&adj, 10).is_empty());
+    }
+
+    #[test]
+    fn linear_chain() {
+        let adj = build_adjacency(&[
+            dep(1, 10, 20, 0),
+            dep(2, 20, 30, 0),
+            dep(3, 30, 40, 0),
+        ]);
+        assert_eq!(downstream(&adj, 10), vec![20, 30, 40]);
+    }
+
+    #[test]
+    fn diamond_visits_each_once() {
+        // 10 -> 20 -> 40
+        // 10 -> 30 -> 40
+        let adj = build_adjacency(&[
+            dep(1, 10, 20, 0),
+            dep(2, 10, 30, 0),
+            dep(3, 20, 40, 0),
+            dep(4, 30, 40, 0),
+        ]);
+        let d = downstream(&adj, 10);
+        let s: HashSet<i64> = d.iter().copied().collect();
+        assert_eq!(s, HashSet::from([20, 30, 40]));
+        assert_eq!(d.len(), 3);   // each node exactly once
+    }
 }
 
 #[cfg(test)]
