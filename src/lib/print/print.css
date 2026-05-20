@@ -1,0 +1,56 @@
+/* Applied only when printing. */
+@media print {
+  @page {
+    size: A3 landscape;
+    margin: 10mm;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Hide app chrome. */
+  .sidebar, .details, .indicator, .backdrop, .modal, .new-job, .add-task, .add-phase {
+    display: none !important;
+  }
+
+  /* Use the full width for the canvas. */
+  .app-shell {
+    display: block !important;
+    height: auto !important;
+  }
+  .canvas-pane {
+    overflow: visible !important;
+    background: white !important;
+  }
+
+  /* Fit-to-page scales the SVG down — relies on macOS print dialog "Scale to fit" for v1. */
+  body.print-scaling-fit .gantt {
+    transform-origin: top left;
+  }
+
+  /* Show printed job header. */
+  .print-header {
+    display: block !important;
+    margin-bottom: 6mm;
+  }
+  .print-footer {
+    display: block !important;
+    margin-top: 6mm;
+    font-size: 9pt;
+  }
+
+  /* Make the LeftRail show through cleanly. */
+  .left-rail {
+    padding-top: 0 !important;
+    border: 1px solid #ccc;
+  }
+  .header-strip {
+    position: relative !important;
+    background: white !important;
+  }
+}
+
+/* When not printing, hide the printed-only header/footer. */
+.print-header, .print-footer { display: none; }
