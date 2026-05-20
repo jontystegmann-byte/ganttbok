@@ -51,6 +51,17 @@ class Store {
 
   async openJob(jobId: number): Promise<void> {
     this.currentJob   = await ipc.getJob(jobId);
+    if (!this.currentJob.is_template) {
+      const start = this.currentJob.project_start_date;
+      const startDate = new Date(start);
+      const end = new Date(startDate);
+      end.setMonth(end.getMonth() + 18);
+      await ipc.syncSaHolidays({
+        job_id: jobId,
+        from: start,
+        to: end.toISOString().slice(0, 10),
+      });
+    }
     this.phases       = await ipc.listPhases(jobId);
     this.tasks        = await ipc.listTasks(jobId);
     this.dependencies = await ipc.listDependencies(jobId);
