@@ -4,6 +4,7 @@
   import Sidebar from './lib/sidebar/Sidebar.svelte';
   import GanttCanvas from './lib/canvas/GanttCanvas.svelte';
   import DetailsPanel from './lib/details/DetailsPanel.svelte';
+  import SavedIndicator from './lib/footer/SavedIndicator.svelte';
 
   onMount(async () => {
     await store.bootstrap();
@@ -48,6 +49,8 @@
     </aside>
   {/if}
 </div>
+
+<SavedIndicator />
 
 <style>
   .app-shell {
