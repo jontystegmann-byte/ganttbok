@@ -7,9 +7,26 @@ pub mod repo;
 
 pub use error::{GbError, GbResult};
 
+use commands::Db;
+use std::path::PathBuf;
+
+fn db_path() -> PathBuf {
+    let dir = dirs::data_local_dir()
+        .expect("no data_local_dir")
+        .join("Gantt Bok");
+    std::fs::create_dir_all(&dir).expect("could not create data dir");
+    dir.join("ganttbok.db")
+}
+
 pub fn run() {
+    let conn = db::connection::open(&db_path()).expect("failed to open db");
+    let db = Db::new(conn);
+
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![])
+        .manage(db)
+        .invoke_handler(tauri::generate_handler![
+            // (command list grows task-by-task — left empty for now)
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
