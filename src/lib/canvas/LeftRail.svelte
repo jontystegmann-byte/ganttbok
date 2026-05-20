@@ -1,12 +1,43 @@
 <script lang="ts">
   import { store } from '../store.svelte';
   import * as ipc from '../ipc';
+  import { addWorkdays } from '../calendar';
+  import type { Task } from '../types';
 
   async function toggleCollapse(phaseId: number) {
     const phase = store.phases.find(p => p.id === phaseId);
     if (!phase) return;
     phase.collapsed = !phase.collapsed;
     await ipc.updatePhase($state.snapshot(phase));
+  }
+
+  /** Format workdays as a weeks string with 1 decimal place ("0.6w", "1w", "2.4w"). */
+  function fmtWeeks(workdays: number): string {
+    if (workdays <= 0) return '';
+    const weeks = workdays / 5;
+    // Strip trailing .0 so whole weeks read clean.
+    const rounded = Math.round(weeks * 10) / 10;
+    return rounded === Math.floor(rounded) ? `${rounded}w` : `${rounded.toFixed(1)}w`;
+  }
+
+  /**
+   * Phase duration in workdays — span from earliest task start to latest task end.
+   * Matches the PhaseBar's visual span (not the sum of individual task durations).
+   */
+  function phaseWorkdays(tasks: Task[]): number {
+    if (tasks.length === 0) return 0;
+    const starts = tasks.map(t => t.start_date).sort();
+    const ends = tasks.map(t => addWorkdays(t.start_date, Math.max(0, t.duration_workdays - 1))).sort();
+    const start = starts[0];
+    const end = ends[ends.length - 1];
+    // Count workdays inclusive of both endpoints.
+    let cur = start;
+    let n = 0;
+    while (cur <= end) {
+      n++;
+      cur = addWorkdays(cur, 1);
+    }
+    return n;
   }
 </script>
 
@@ -32,6 +63,7 @@
       </button>
       <span class="num">{pi + 1}.</span>
       <span class="name" onclick={() => store.select({ kind: 'phase', id: phase.id })} role="button" tabindex="0">{phase.name}</span>
+      <span class="weeks">{fmtWeeks(phaseWorkdays(store.tasksByPhase.get(phase.id) ?? []))}</span>
     </div>
     {#if !phase.collapsed}
       {@const phaseTasks = store.tasksByPhase.get(phase.id) ?? []}
@@ -56,6 +88,7 @@
         >
           <span class="num">{pi + 1}.{ti + 1}</span>
           <span class="name" onclick={() => store.select({ kind: 'task', id: task.id })} role="button" tabindex="0">{task.name}</span>
+          <span class="weeks">{fmtWeeks(task.duration_workdays)}</span>
         </div>
       {/each}
       <button class="add-task" onclick={async () => {
@@ -90,6 +123,14 @@
   }
   .num { font-variant-numeric: tabular-nums; color: var(--c-text-muted); min-width: 28px; }
   .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .weeks {
+    font-variant-numeric: tabular-nums;
+    color: var(--c-text-muted);
+    opacity: 0.6;
+    font-size: var(--font-size-xs);
+    padding-right: var(--sp-1);
+    flex-shrink: 0;
+  }
   .add-task, .add-phase {
     width: 100%; text-align: left; padding: var(--sp-2) var(--sp-3);
     background: transparent; border: none; cursor: pointer;
