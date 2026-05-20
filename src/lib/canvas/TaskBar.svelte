@@ -37,14 +37,36 @@
       liveDelta: 0,
     };
   }
+
+  function onHandleDown(e: PointerEvent) {
+    e.stopPropagation();
+    store.depCreator = {
+      fromTaskId: task.id,
+      fromX: e.clientX,
+      fromY: e.clientY,
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      hoverTaskId: null,
+    };
+  }
+
+  const showHandle = $derived(
+    store.hoveredTaskId === task.id && !store.dragState && !store.depCreator,
+  );
 </script>
 
 <g
   class="task-bar"
   data-zone={store.dragState?.taskId === task.id ? store.dragState.zone : null}
   onpointerdown={onPointerDown}
-  onmouseenter={() => store.hoveredTaskId = task.id}
-  onmouseleave={() => store.hoveredTaskId = null}
+  onmouseenter={() => {
+    store.hoveredTaskId = task.id;
+    if (store.depCreator) store.depCreator.hoverTaskId = task.id;
+  }}
+  onmouseleave={() => {
+    if (store.hoveredTaskId === task.id) store.hoveredTaskId = null;
+    if (store.depCreator?.hoverTaskId === task.id) store.depCreator.hoverTaskId = null;
+  }}
   role="button"
   tabindex="0"
 >
@@ -60,6 +82,18 @@
   {#if livePreview.w > 60}
     <text x={livePreview.x + 6} y={y + 14} fill="white" font-size="11">{task.name}</text>
   {/if}
+  {#if showHandle}
+    <circle
+      cx={livePreview.x + livePreview.w}
+      cy={y + 10}
+      r={5}
+      fill="white"
+      stroke="var(--c-accent)"
+      stroke-width="2"
+      class="dep-handle"
+      onpointerdown={onHandleDown}
+    />
+  {/if}
 </g>
 
 <style>
@@ -67,4 +101,5 @@
   .task-bar:active { cursor: grabbing; }
   .task-bar[data-zone="resize-start"],
   .task-bar[data-zone="resize-end"] { cursor: ew-resize; }
+  .dep-handle { cursor: crosshair; }
 </style>

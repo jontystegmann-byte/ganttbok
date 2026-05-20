@@ -7,6 +7,7 @@
   import PhaseBar from './PhaseBar.svelte';
   import DependencyArrow from './DependencyArrow.svelte';
   import DragOverlay from './DragOverlay.svelte';
+  import DepCreator from './DepCreator.svelte';
   import { computeViewportDays } from '../calendar';
   import type { Phase, Task } from '../types';
   import * as ipc from '../ipc';
@@ -49,6 +50,7 @@
 
 <div class="gantt" style="--cell-w: {CELL}px;">
   <DragOverlay />
+  <DepCreator />
   <LeftRail />
   <div class="grid-area" style="--total-w: {days.length * CELL}px;">
     <HeaderStrip {days} />
