@@ -21,6 +21,14 @@ class Store {
   selection     = $state<Selection>(null);
   sidebarWidth  = $state<number>(240);
   showNewJobModal = $state<boolean>(false);
+  archivedJobs = $state<Job[]>([]);
+
+  async refreshArchived(): Promise<void> {
+    // Backend doesn't have a list_archived command; fetch all by toggling and use a generic.
+    // For Plan 2 we fake it by calling list_jobs with a future extension. Until backend exposes it,
+    // archived stays empty. (Backend extension is a 5-line task scheduled for Plan 3.)
+    this.archivedJobs = [];
+  }
 
   async createJob(args: { name: string; client: string | null; address: string | null; project_start_date: string; }): Promise<void> {
     const job = await ipc.createJob({ ...args, is_template: false });
