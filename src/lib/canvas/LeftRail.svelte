@@ -74,6 +74,7 @@
     border-right: 1px solid var(--c-border);
     background: var(--c-panel);
     overflow-y: auto;
+    padding-top: var(--header-height);
   }
   .phase-row, .task-row {
     display: flex; align-items: center; gap: var(--sp-2);

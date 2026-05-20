@@ -4,15 +4,19 @@ use chrono::{Datelike, Duration, NaiveDate, Weekday};
 /// `from` itself counts as day 0 of work iff it is a workday; otherwise advance to the next workday first.
 pub fn add_workdays(from: NaiveDate, n: i64) -> NaiveDate {
     let mut cur = from;
+    // Snap to a workday if we landed on a weekend.
+    // Direction follows the sign of n (positive/zero → forward, negative → backward).
+    let snap_dir: i64 = if n >= 0 { 1 } else { -1 };
     while !is_workday(cur) {
-        cur += Duration::days(1);
+        cur += Duration::days(snap_dir);
     }
-    if n <= 0 {
+    if n == 0 {
         return cur;
     }
-    let mut remaining = n;
+    let step: i64 = if n > 0 { 1 } else { -1 };
+    let mut remaining = n.abs();
     while remaining > 0 {
-        cur += Duration::days(1);
+        cur += Duration::days(step);
         if is_workday(cur) {
             remaining -= 1;
         }
@@ -50,13 +54,15 @@ pub fn add_workdays_excluding(
 ) -> NaiveDate {
     let is_work = |d: NaiveDate| is_workday(d) && !excluded.contains(&d);
     let mut cur = from;
+    let snap_dir: i64 = if n >= 0 { 1 } else { -1 };
     while !is_work(cur) {
-        cur += Duration::days(1);
+        cur += Duration::days(snap_dir);
     }
-    if n <= 0 { return cur; }
-    let mut remaining = n;
+    if n == 0 { return cur; }
+    let step: i64 = if n > 0 { 1 } else { -1 };
+    let mut remaining = n.abs();
     while remaining > 0 {
-        cur += Duration::days(1);
+        cur += Duration::days(step);
         if is_work(cur) { remaining -= 1; }
     }
     cur
@@ -88,6 +94,16 @@ mod tests {
     #[test]
     fn add_five_workdays_from_monday_skips_weekend() {
         assert_eq!(add_workdays(d(2026, 6, 8), 5), d(2026, 6, 15)); // Mon -> next Mon
+    }
+
+    #[test]
+    fn add_negative_workdays_goes_backwards() {
+        // Mon 15 Jun - 5 workdays = previous Mon 8 Jun
+        assert_eq!(add_workdays(d(2026, 6, 15), -5), d(2026, 6, 8));
+        // Mon 15 Jun - 1 workday = previous Fri 12 Jun
+        assert_eq!(add_workdays(d(2026, 6, 15), -1), d(2026, 6, 12));
+        // Sat - 0 workdays snaps backward to previous Friday (was previously forward to Mon)
+        assert_eq!(add_workdays(d(2026, 6, 6), -1), d(2026, 6, 4)); // Sat → Fri → Thu (1 step back)
     }
 
     #[test]

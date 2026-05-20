@@ -39,12 +39,17 @@ export function addCalendarDays(iso: string, n: number): string {
 
 export function addWorkdays(iso: string, n: number): string {
   let d = parse(iso);
+  // Snap to a workday if we landed on a weekend. Direction follows the sign of n
+  // (positive/zero → snap forward, negative → snap backward).
+  const snapDir = n >= 0 ? 1 : -1;
   while (!isWorkday(d)) {
-    d.setUTCDate(d.getUTCDate() + 1);
+    d.setUTCDate(d.getUTCDate() + snapDir);
   }
-  let remaining = n;
+  if (n === 0) return fmt(d);
+  const step = n > 0 ? 1 : -1;
+  let remaining = Math.abs(n);
   while (remaining > 0) {
-    d.setUTCDate(d.getUTCDate() + 1);
+    d.setUTCDate(d.getUTCDate() + step);
     if (isWorkday(d)) remaining--;
   }
   return fmt(d);

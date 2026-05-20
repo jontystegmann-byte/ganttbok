@@ -38,6 +38,12 @@ describe('calendar', () => {
     expect(addWorkdays('2026-06-12', 1)).toBe('2026-06-15'); // Fri + 1 wd = Mon
   });
 
+  it('addWorkdays handles negative shifts (drag-backwards bugfix)', () => {
+    expect(addWorkdays('2026-06-15', -5)).toBe('2026-06-08'); // Mon - 5 wd = previous Mon
+    expect(addWorkdays('2026-06-15', -1)).toBe('2026-06-12'); // Mon - 1 wd = previous Fri
+    expect(addWorkdays('2026-06-15', 0)).toBe('2026-06-15');  // no shift
+  });
+
   it('addCalendarDays advances literally', () => {
     expect(addCalendarDays('2026-06-08', 1)).toBe('2026-06-09');
     expect(addCalendarDays('2026-06-08', 7)).toBe('2026-06-15');

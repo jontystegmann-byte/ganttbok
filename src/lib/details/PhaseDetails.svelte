@@ -45,7 +45,7 @@
   <div class="phase-details">
     <h2>{phase.name}</h2>
     <label>Name<input bind:value={name} onblur={save} /></label>
-    <label>Colour<input type="color" bind:value={colour} onblur={save} /></label>
+    <label>Colour<input type="color" bind:value={colour} onchange={save} /></label>
     <button class="danger" onclick={del}>{confirmingDelete ? 'Click again — deletes ALL tasks in this phase' : 'Delete phase'}</button>
   </div>
 {/if}
