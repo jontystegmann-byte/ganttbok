@@ -22,13 +22,29 @@
     if (deltaWorkdays === 0) return;
     if (!state.currentJob) return;
 
-    const newStart = addWorkdays(d.originalStart, deltaWorkdays);
-    const result = await ipc.dragTask({
-      job_id: state.currentJob.id,
-      task_id: d.taskId,
-      new_start_date: newStart,
-    });
-    state.applyDragResult(result.updated_tasks);
+    const task = state.tasks.find(t => t.id === d.taskId);
+    if (!task) return;
+
+    if (d.zone === 'move') {
+      const newStart = addWorkdays(d.originalStart, deltaWorkdays);
+      const result = await ipc.dragTask({
+        job_id: state.currentJob.id,
+        task_id: d.taskId,
+        new_start_date: newStart,
+      });
+      state.applyDragResult(result.updated_tasks);
+    } else if (d.zone === 'resize-end') {
+      const newDur = Math.max(1, d.originalDuration + deltaWorkdays);
+      const updated = { ...task, duration_workdays: newDur };
+      await ipc.updateTask($state.snapshot(updated));
+      state.tasks = state.tasks.map(t => t.id === task.id ? updated : t);
+    } else if (d.zone === 'resize-start') {
+      const newStart = addWorkdays(d.originalStart, deltaWorkdays);
+      const newDur = Math.max(1, d.originalDuration - deltaWorkdays);
+      const updated = { ...task, start_date: newStart, duration_workdays: newDur };
+      await ipc.updateTask($state.snapshot(updated));
+      state.tasks = state.tasks.map(t => t.id === task.id ? updated : t);
+    }
     await ipc.touchLastSave();
   }
 
