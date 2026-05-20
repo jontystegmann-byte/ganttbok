@@ -106,6 +106,37 @@ class Store {
     this.selection = s;
   }
 
+  async reorderTasksInPhase(phaseId: number, orderedIds: number[]): Promise<void> {
+    await ipc.reorderTasks(phaseId, orderedIds);
+    const idx = new Map(orderedIds.map((id, i) => [id, i]));
+    this.tasks = this.tasks.map(t => t.phase_id === phaseId ? { ...t, order_index: idx.get(t.id) ?? t.order_index } : t);
+  }
+
+  async reorderPhases(orderedIds: number[]): Promise<void> {
+    if (!this.currentJob) return;
+    await ipc.reorderPhases(this.currentJob.id, orderedIds);
+    const idx = new Map(orderedIds.map((id, i) => [id, i]));
+    this.phases = this.phases.map(p => ({ ...p, order_index: idx.get(p.id) ?? p.order_index }))
+                              .sort((a, b) => a.order_index - b.order_index);
+  }
+
+  async createPhase(name: string): Promise<void> {
+    if (!this.currentJob) return;
+    const palette = ['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#14B8A6'];
+    const colour = palette[this.phases.length % palette.length];
+    const phase = await ipc.createPhase({ job_id: this.currentJob.id, name, colour });
+    this.phases = [...this.phases, phase].sort((a, b) => a.order_index - b.order_index);
+  }
+
+  async createTaskInPhase(phaseId: number, name: string): Promise<void> {
+    if (!this.currentJob) return;
+    const start = this.currentJob.project_start_date;
+    const task = await ipc.createTask({
+      phase_id: phaseId, name, start_date: start, duration_workdays: 3,
+    });
+    this.tasks = [...this.tasks, task];
+  }
+
   // Optimistic local update applied after an IPC mutation returns updated rows.
   applyDragResult(updated: Task[]): void {
     const byId = new Map(updated.map(t => [t.id, t]));

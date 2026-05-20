@@ -21,7 +21,24 @@
     </div>
     {#if !phase.collapsed}
       {#each (state.tasksByPhase.get(phase.id) ?? []) as task, ti (task.id)}
-        <div class="task-row" style="height: var(--row-height);">
+        <div class="task-row"
+          style="height: var(--row-height);"
+          draggable="true"
+          ondragstart={(e) => { e.dataTransfer!.setData('text/task-id', String(task.id)); }}
+          ondragover={(e) => e.preventDefault()}
+          ondrop={async (e) => {
+            e.preventDefault();
+            const draggedId = Number(e.dataTransfer!.getData('text/task-id'));
+            if (!draggedId || draggedId === task.id) return;
+            const targetTasks = state.tasksByPhase.get(phase.id) ?? [];
+            // Only reorder within same phase.
+            if (!targetTasks.some(t => t.id === draggedId)) return;
+            const ordered = targetTasks.map(t => t.id).filter(id => id !== draggedId);
+            const targetIdx = targetTasks.findIndex(t => t.id === task.id);
+            ordered.splice(targetIdx, 0, draggedId);
+            await state.reorderTasksInPhase(phase.id, ordered);
+          }}
+        >
           <span class="num">{pi + 1}.{ti + 1}</span>
           <span class="name">{task.name}</span>
         </div>
