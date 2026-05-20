@@ -9,6 +9,7 @@
   import DragOverlay from './DragOverlay.svelte';
   import { computeViewportDays } from '../calendar';
   import type { Phase, Task } from '../types';
+  import * as ipc from '../ipc';
 
   const days = $derived.by(() => {
     if (!state.currentJob) return [];
@@ -58,6 +59,26 @@
         height={totalHeight}
         class="canvas-svg"
         onclick={() => state.select(null)}
+        ondblclick={async (e) => {
+          const svgRect = (e.currentTarget as SVGElement).getBoundingClientRect();
+          const x = e.clientX - svgRect.left;
+          const y = e.clientY - svgRect.top;
+          const dayIdx = Math.floor(x / CELL);
+          const rowIdx = Math.floor(y / ROW_H);
+          if (dayIdx < 0 || dayIdx >= days.length) return;
+          if (rowIdx < 0 || rowIdx >= rows.length) return;
+          const r = rows[rowIdx];
+          const phaseId = r.phase.id;
+          if (!phaseId) return;
+          const name = prompt('Task name?');
+          if (!name?.trim()) return;
+          const date = days[dayIdx].date;
+          const task = await ipc.createTask({
+            phase_id: phaseId, name: name.trim(), start_date: date, duration_workdays: 1,
+          });
+          state.tasks = [...state.tasks, task];
+          await ipc.touchLastSave();
+        }}
       >
         <defs>
           <marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
