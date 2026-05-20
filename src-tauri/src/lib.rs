@@ -9,6 +9,7 @@ pub use error::{GbError, GbResult};
 
 use commands::Db;
 use std::path::PathBuf;
+use tauri::Manager;
 
 fn db_path() -> PathBuf {
     let dir = dirs::data_local_dir()
@@ -59,6 +60,15 @@ pub fn run() {
             commands::meta::set_sidebar_width,
             commands::meta::touch_last_save,
         ])
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                let app = window.app_handle();
+                if let Some(state) = app.try_state::<Db>() {
+                    let conn = state.0.lock().unwrap();
+                    let _ = crate::db::models::meta_set(&conn, "clean_shutdown", "1");
+                }
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
