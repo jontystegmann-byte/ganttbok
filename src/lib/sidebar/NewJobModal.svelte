@@ -5,6 +5,7 @@
   let client = $state('');
   let address = $state('');
   let startDate = $state(new Date().toISOString().slice(0, 10));
+  let templateId = $state<number | null>(null);
   let submitting = $state(false);
 
   async function submit(e: SubmitEvent) {
@@ -12,12 +13,21 @@
     if (!name.trim()) return;
     submitting = true;
     try {
-      await store.createJob({
-        name: name.trim(),
-        client: client.trim() || null,
-        address: address.trim() || null,
-        project_start_date: startDate,
-      });
+      if (templateId !== null) {
+        await store.createFromTemplate(templateId, {
+          new_name: name.trim(),
+          client: client.trim() || null,
+          address: address.trim() || null,
+          project_start_date: startDate,
+        });
+      } else {
+        await store.createJob({
+          name: name.trim(),
+          client: client.trim() || null,
+          address: address.trim() || null,
+          project_start_date: startDate,
+        });
+      }
     } finally {
       submitting = false;
     }
@@ -29,6 +39,14 @@
 <div class="backdrop" onclick={cancel} role="presentation"></div>
 <form class="modal" onsubmit={submit}>
   <h2>New job</h2>
+  <label>Start from
+    <select bind:value={templateId}>
+      <option value={null}>Blank</option>
+      {#each store.templates as t}
+        <option value={t.id}>Template: {t.name}</option>
+      {/each}
+    </select>
+  </label>
   <label>Name<input bind:value={name} autofocus required /></label>
   <label>Client<input bind:value={client} placeholder="optional" /></label>
   <label>Address<input bind:value={address} placeholder="optional" /></label>
@@ -54,7 +72,7 @@
   }
   .modal h2 { margin: 0 0 var(--sp-2); font-size: var(--font-size-lg); }
   label { display: flex; flex-direction: column; gap: var(--sp-1); font-size: var(--font-size-sm); color: var(--c-text-muted); }
-  input { padding: var(--sp-2); border: 1px solid var(--c-border); border-radius: 4px; }
+  input, select { padding: var(--sp-2); border: 1px solid var(--c-border); border-radius: 4px; }
   .actions { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-2); }
   .actions button { padding: var(--sp-2) var(--sp-3); border: 1px solid var(--c-border); background: var(--c-bg); border-radius: 4px; cursor: pointer; }
   .actions .primary { background: var(--c-accent); color: white; border-color: var(--c-accent); }

@@ -119,6 +119,17 @@ class Store {
     this.showNewJobModal = false;
   }
 
+  async createFromTemplate(
+    templateId: number,
+    args: { new_name: string; client: string | null; address: string | null; project_start_date: string },
+  ): Promise<void> {
+    const job = await ipc.instantiateTemplate({ template_id: templateId, ...args });
+    await this.refreshSidebar();
+    await this.openJob(job.id);
+    await ipc.touchLastSave();
+    this.showNewJobModal = false;
+  }
+
   // Derived helpers
   tasksByPhase = $derived.by(() => {
     const m = new Map<number, Task[]>();
