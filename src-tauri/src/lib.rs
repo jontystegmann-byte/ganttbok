@@ -34,6 +34,11 @@ pub fn run() {
             commands::job::delete_job,
             commands::template::save_as_template,
             commands::template::instantiate_template,
+            commands::phase::list_phases,
+            commands::phase::create_phase,
+            commands::phase::update_phase,
+            commands::phase::delete_phase,
+            commands::phase::reorder_phases,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
