@@ -8,25 +8,31 @@
 
   let name = $state('');
   let colour = $state('#3B82F6');
+  let confirmingDelete = $state(false);
 
   $effect(() => {
     if (phase) {
       name = phase.name;
       colour = phase.colour;
+      confirmingDelete = false;
     }
   });
 
   async function save() {
     if (!phase) return;
     const updated: Phase = { ...phase, name: name.trim() || phase.name, colour };
-    await ipc.updatePhase($store.snapshot(updated));
+    await ipc.updatePhase($state.snapshot(updated));
     store.phases = store.phases.map(p => p.id === updated.id ? updated : p);
     await ipc.touchLastSave();
   }
 
   async function del() {
     if (!phase) return;
-    if (!confirm(`Delete phase "${phase.name}" and ALL its tasks?`)) return;
+    if (!confirmingDelete) {
+      confirmingDelete = true;
+      setTimeout(() => { confirmingDelete = false; }, 3000);
+      return;
+    }
     await ipc.deletePhase(phase.id);
     store.phases = store.phases.filter(p => p.id !== phase.id);
     store.tasks  = store.tasks.filter(t => t.phase_id !== phase.id);
@@ -40,7 +46,7 @@
     <h2>{phase.name}</h2>
     <label>Name<input bind:value={name} onblur={save} /></label>
     <label>Colour<input type="color" bind:value={colour} onblur={save} /></label>
-    <button class="danger" onclick={del}>Delete phase</button>
+    <button class="danger" onclick={del}>{confirmingDelete ? 'Click again — deletes ALL tasks in this phase' : 'Delete phase'}</button>
   </div>
 {/if}
 

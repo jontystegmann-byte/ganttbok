@@ -70,13 +70,12 @@
           const r = rows[rowIdx];
           const phaseId = r.phase.id;
           if (!phaseId) return;
-          const name = prompt('Task name?');
-          if (!name?.trim()) return;
           const date = days[dayIdx].date;
           const task = await ipc.createTask({
-            phase_id: phaseId, name: name.trim(), start_date: date, duration_workdays: 1,
+            phase_id: phaseId, name: 'New task', start_date: date, duration_workdays: 1,
           });
           store.tasks = [...store.tasks, task];
+          store.selection = { kind: 'task', id: task.id };
           await ipc.touchLastSave();
         }}
       >

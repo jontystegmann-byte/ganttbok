@@ -6,7 +6,7 @@
     const phase = store.phases.find(p => p.id === phaseId);
     if (!phase) return;
     phase.collapsed = !phase.collapsed;
-    await ipc.updatePhase($store.snapshot(phase));
+    await ipc.updatePhase($state.snapshot(phase));
   }
 </script>
 
@@ -59,14 +59,12 @@
         </div>
       {/each}
       <button class="add-task" onclick={async () => {
-        const n = prompt('Task name?');
-        if (n?.trim()) await store.createTaskInPhase(phase.id, n.trim());
+        await store.createTaskInPhase(phase.id, 'New task');
       }}>+ Task</button>
     {/if}
   {/each}
   <button class="add-phase" onclick={async () => {
-    const n = prompt('Phase name?');
-    if (n?.trim()) await store.createPhase(n.trim());
+    await store.createPhase('New phase');
   }}>+ Phase</button>
 </div>
 

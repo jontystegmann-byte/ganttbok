@@ -35,10 +35,13 @@
     pointer-events: none;
   }
   .label {
-    position: absolute; top: 4px; left: 50%;
-    transform: translateX(-50%) rotate(90deg);
-    transform-origin: center top;
-    font-size: 9px; color: var(--c-no-work-text);
+    position: absolute;
+    top: 8px;
+    left: 0; right: 0;
+    text-align: center;
+    writing-mode: vertical-rl;
+    font-size: 9px;
+    color: var(--c-no-work-text);
     white-space: nowrap;
     pointer-events: auto;
   }

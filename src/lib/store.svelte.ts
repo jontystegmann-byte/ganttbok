@@ -125,7 +125,9 @@ class Store {
     const palette = ['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#14B8A6'];
     const colour = palette[this.phases.length % palette.length];
     const phase = await ipc.createPhase({ job_id: this.currentJob.id, name, colour });
+    // Newly-created phases come back expanded (collapsed=false from the IPC command).
     this.phases = [...this.phases, phase].sort((a, b) => a.order_index - b.order_index);
+    this.selection = { kind: 'phase', id: phase.id };
   }
 
   async createTaskInPhase(phaseId: number, name: string): Promise<void> {
@@ -135,6 +137,7 @@ class Store {
       phase_id: phaseId, name, start_date: start, duration_workdays: 3,
     });
     this.tasks = [...this.tasks, task];
+    this.selection = { kind: 'task', id: task.id };
   }
 
   // Optimistic local update applied after an IPC mutation returns updated rows.

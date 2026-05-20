@@ -9,12 +9,14 @@
   let name = $state('');
   let duration = $state(1);
   let notes = $state('');
+  let confirmingDelete = $state(false);
 
   $effect(() => {
     if (task) {
       name = task.name;
       duration = task.duration_workdays;
       notes = task.notes ?? '';
+      confirmingDelete = false;
     }
   });
 
@@ -26,14 +28,18 @@
       duration_workdays: Math.max(1, duration),
       notes: notes.trim() || null,
     };
-    await ipc.updateTask($store.snapshot(updated));
+    await ipc.updateTask($state.snapshot(updated));
     store.tasks = store.tasks.map(t => t.id === updated.id ? updated : t);
     await ipc.touchLastSave();
   }
 
   async function del() {
     if (!task) return;
-    if (!confirm(`Delete task "${task.name}"?`)) return;
+    if (!confirmingDelete) {
+      confirmingDelete = true;
+      setTimeout(() => { confirmingDelete = false; }, 3000);
+      return;
+    }
     await ipc.deleteTask(task.id);
     store.tasks = store.tasks.filter(t => t.id !== task.id);
     store.select(null);
@@ -48,7 +54,7 @@
     <label>Duration (workdays)<input type="number" min="1" bind:value={duration} onblur={save} /></label>
     <label>Start<input type="date" value={task.start_date} disabled /></label>
     <label>Notes<textarea bind:value={notes} onblur={save} rows="4"></textarea></label>
-    <button class="danger" onclick={del}>Delete task</button>
+    <button class="danger" onclick={del}>{confirmingDelete ? 'Click again to confirm delete' : 'Delete task'}</button>
   </div>
 {/if}
 

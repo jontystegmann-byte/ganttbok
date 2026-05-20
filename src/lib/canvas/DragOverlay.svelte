@@ -36,13 +36,13 @@
     } else if (d.zone === 'resize-end') {
       const newDur = Math.max(1, d.originalDuration + deltaWorkdays);
       const updated = { ...task, duration_workdays: newDur };
-      await ipc.updateTask($store.snapshot(updated));
+      await ipc.updateTask($state.snapshot(updated));
       store.tasks = store.tasks.map(t => t.id === task.id ? updated : t);
     } else if (d.zone === 'resize-start') {
       const newStart = addWorkdays(d.originalStart, deltaWorkdays);
       const newDur = Math.max(1, d.originalDuration - deltaWorkdays);
       const updated = { ...task, start_date: newStart, duration_workdays: newDur };
-      await ipc.updateTask($store.snapshot(updated));
+      await ipc.updateTask($state.snapshot(updated));
       store.tasks = store.tasks.map(t => t.id === task.id ? updated : t);
     }
     await ipc.touchLastSave();
