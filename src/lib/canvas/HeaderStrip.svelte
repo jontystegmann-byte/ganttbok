@@ -1,11 +1,34 @@
 <script lang="ts">
   import type { ViewportDay } from '../calendar';
+  import { store } from '../store.svelte';
+  import ContextMenu from '../components/ContextMenu.svelte';
+
   let { days }: { days: ViewportDay[] } = $props();
+
+  let menu = $state<{ x: number; y: number; date: string } | null>(null);
+
+  function onContext(e: MouseEvent, date: string) {
+    e.preventDefault();
+    menu = { x: e.clientX, y: e.clientY, date };
+  }
+
+  const menuItems = $derived.by(() => {
+    if (!menu) return [];
+    const date = menu.date;
+    const isManual = store.noWorkDays.some(n => n.date === date && n.source === 'manual');
+    return [
+      {
+        label: isManual ? 'Mark as working day' : 'Mark non-working day',
+        action: () => store.toggleNoWorkDay(date),
+      },
+    ];
+  });
 </script>
 
 <div class="header-strip" style="--total-w: {days.length * 24}px;">
   {#each days as d (d.date)}
-    <div class="cell" class:week-start={d.weekday === 'M'}>
+    <div class="cell" class:week-start={d.weekday === 'M'}
+         oncontextmenu={(e) => onContext(e, d.date)}>
       {#if d.weekday === 'M'}
         <div class="week-num">Week {d.projectWeekNumber}</div>
       {/if}
@@ -16,6 +39,10 @@
     </div>
   {/each}
 </div>
+
+{#if menu}
+  <ContextMenu x={menu.x} y={menu.y} items={menuItems} onclose={() => menu = null} />
+{/if}
 
 <style>
   .header-strip {

@@ -243,6 +243,22 @@ class Store {
     this.recordHistory();
   }
 
+  async toggleNoWorkDay(date: string): Promise<void> {
+    if (!this.currentJob) return;
+    const existing = this.noWorkDays.find(n => n.date === date && n.source === 'manual');
+    if (existing) {
+      await ipc.deleteNoWorkDay(existing.id);
+      this.noWorkDays = this.noWorkDays.filter(n => n.id !== existing.id);
+    } else {
+      const created = await ipc.addManualNoWorkDay({
+        job_id: this.currentJob.id, date, reason: 'Site closed',
+      });
+      this.noWorkDays = [...this.noWorkDays, created];
+    }
+    this.recordHistory();
+    await ipc.touchLastSave();
+  }
+
   // Optimistic local update applied after an IPC mutation returns updated rows.
   applyDragResult(updated: Task[]): void {
     const byId = new Map(updated.map(t => [t.id, t]));
