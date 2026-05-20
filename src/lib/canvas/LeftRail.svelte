@@ -31,7 +31,7 @@
         {phase.collapsed ? '▸' : '▾'}
       </button>
       <span class="num">{pi + 1}.</span>
-      <span class="name">{phase.name}</span>
+      <span class="name" onclick={() => state.select({ kind: 'phase', id: phase.id })} role="button" tabindex="0">{phase.name}</span>
     </div>
     {#if !phase.collapsed}
       {#each (state.tasksByPhase.get(phase.id) ?? []) as task, ti (task.id)}
@@ -54,7 +54,7 @@
           }}
         >
           <span class="num">{pi + 1}.{ti + 1}</span>
-          <span class="name">{task.name}</span>
+          <span class="name" onclick={() => state.select({ kind: 'task', id: task.id })} role="button" tabindex="0">{task.name}</span>
         </div>
       {/each}
     {/if}
