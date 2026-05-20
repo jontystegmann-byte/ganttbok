@@ -5,6 +5,7 @@
   import NoWorkColumn from './NoWorkColumn.svelte';
   import TaskBar from './TaskBar.svelte';
   import PhaseBar from './PhaseBar.svelte';
+  import DependencyArrow from './DependencyArrow.svelte';
   import { computeViewportDays } from '../calendar';
   import type { Phase, Task } from '../types';
 
@@ -36,6 +37,12 @@
   const ROW_H = 32;
   const CELL = 24;
   const totalHeight = $derived(rows.length * ROW_H);
+
+  const rowIndexMap = $derived.by(() => {
+    const m = new Map<number, number>();
+    rows.forEach((r, i) => { if (r.kind === 'task') m.set(r.task.id, i); });
+    return m;
+  });
 </script>
 
 <div class="gantt" style="--cell-w: {CELL}px;">
@@ -50,12 +57,20 @@
         class="canvas-svg"
         onclick={() => state.select(null)}
       >
+        <defs>
+          <marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--c-border-bold)" />
+          </marker>
+        </defs>
         {#each rows as r, ri (r.kind === 'phase' ? `p${r.phase.id}` : `t${r.task.id}`)}
           {#if r.kind === 'phase' && r.phase.collapsed}
             <PhaseBar phase={r.phase} tasks={state.tasksByPhase.get(r.phase.id) ?? []} {days} row={ri} />
           {:else if r.kind === 'task'}
             <TaskBar task={r.task} phase={r.phase} {days} row={ri} />
           {/if}
+        {/each}
+        {#each state.dependencies as dep (dep.id)}
+          <DependencyArrow {dep} tasks={state.tasks} rowIndex={rowIndexMap} {days} />
         {/each}
       </svg>
     </div>
