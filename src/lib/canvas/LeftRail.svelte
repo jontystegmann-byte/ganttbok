@@ -34,7 +34,8 @@
       <span class="name" onclick={() => state.select({ kind: 'phase', id: phase.id })} role="button" tabindex="0">{phase.name}</span>
     </div>
     {#if !phase.collapsed}
-      {#each (state.tasksByPhase.get(phase.id) ?? []) as task, ti (task.id)}
+      {@const phaseTasks = state.tasksByPhase.get(phase.id) ?? []}
+      {#each phaseTasks as task, ti (task.id)}
         <div class="task-row"
           style="height: var(--row-height);"
           draggable="true"
@@ -57,8 +58,16 @@
           <span class="name" onclick={() => state.select({ kind: 'task', id: task.id })} role="button" tabindex="0">{task.name}</span>
         </div>
       {/each}
+      <button class="add-task" onclick={async () => {
+        const n = prompt('Task name?');
+        if (n?.trim()) await state.createTaskInPhase(phase.id, n.trim());
+      }}>+ Task</button>
     {/if}
   {/each}
+  <button class="add-phase" onclick={async () => {
+    const n = prompt('Phase name?');
+    if (n?.trim()) await state.createPhase(n.trim());
+  }}>+ Phase</button>
 </div>
 
 <style>
@@ -82,4 +91,11 @@
   }
   .num { font-variant-numeric: tabular-nums; color: var(--c-text-muted); min-width: 28px; }
   .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .add-task, .add-phase {
+    width: 100%; text-align: left; padding: var(--sp-2) var(--sp-3);
+    background: transparent; border: none; cursor: pointer;
+    color: var(--c-text-muted); font-size: var(--font-size-sm);
+  }
+  .add-task:hover, .add-phase:hover { background: var(--c-accent-fade); color: var(--c-accent); }
+  .add-task { padding-left: calc(var(--sp-2) * 4); }
 </style>
