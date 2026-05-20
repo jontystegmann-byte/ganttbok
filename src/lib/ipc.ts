@@ -8,6 +8,7 @@ import type {
 // Jobs
 export const listJobs        = ()                                    => invoke<Job[]>('list_jobs');
 export const listTemplates   = ()                                    => invoke<Job[]>('list_templates');
+export const listArchived    = ()                                    => invoke<Job[]>('list_archived');
 export const getJob          = (id: number)                          => invoke<Job>('get_job', { id });
 export const createJob       = (args: CreateJobArgs)                 => invoke<Job>('create_job', { args });
 export const updateJob       = (job: Job)                            => invoke<void>('update_job', { job });

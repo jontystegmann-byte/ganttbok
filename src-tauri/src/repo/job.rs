@@ -47,6 +47,20 @@ pub fn list_active(conn: &Connection) -> GbResult<Vec<Job>> {
     Ok(out)
 }
 
+pub fn list_archived(conn: &Connection) -> GbResult<Vec<Job>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, name, client, address, project_start_date,
+                is_template, archived, created_at
+         FROM job
+         WHERE archived = 1 AND is_template = 0
+         ORDER BY created_at DESC",
+    )?;
+    let rows = stmt.query_map([], row_to_job)?;
+    let mut out = Vec::new();
+    for r in rows { out.push(r?); }
+    Ok(out)
+}
+
 pub fn list_templates(conn: &Connection) -> GbResult<Vec<Job>> {
     let mut stmt = conn.prepare(
         "SELECT id, name, client, address, project_start_date,
@@ -140,6 +154,17 @@ mod tests {
         let list = list_active(&conn).unwrap();
         assert_eq!(list.len(), 1);
         assert_eq!(list[0].name, "B");
+    }
+
+    #[test]
+    fn list_archived_returns_only_archived() {
+        let conn = open_in_memory().unwrap();
+        let a = create(&conn, &sample("A")).unwrap();
+        create(&conn, &sample("B")).unwrap();
+        set_archived(&conn, a.id, true).unwrap();
+        let archived = list_archived(&conn).unwrap();
+        assert_eq!(archived.len(), 1);
+        assert_eq!(archived[0].name, "A");
     }
 
     #[test]

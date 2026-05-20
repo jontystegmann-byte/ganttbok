@@ -28,6 +28,12 @@ pub fn list_templates(db: State<Db>) -> GbResult<Vec<Job>> {
 }
 
 #[tauri::command]
+pub fn list_archived(db: State<Db>) -> GbResult<Vec<Job>> {
+    let conn = db.0.lock().unwrap();
+    job_repo::list_archived(&conn)
+}
+
+#[tauri::command]
 pub fn get_job(db: State<Db>, id: i64) -> GbResult<Job> {
     let conn = db.0.lock().unwrap();
     job_repo::get(&conn, id)

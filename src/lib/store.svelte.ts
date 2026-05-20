@@ -120,10 +120,7 @@ class Store {
   }
 
   async refreshArchived(): Promise<void> {
-    // Backend doesn't have a list_archived command; fetch all by toggling and use a generic.
-    // For Plan 2 we fake it by calling list_jobs with a future extension. Until backend exposes it,
-    // archived stays empty. (Backend extension is a 5-line task scheduled for Plan 3.)
-    this.archivedJobs = [];
+    this.archivedJobs = await ipc.listArchived();
   }
 
   async createJob(args: { name: string; client: string | null; address: string | null; project_start_date: string; }): Promise<void> {
@@ -162,6 +159,7 @@ class Store {
     const meta = await ipc.startupInfo();
     if (meta.sidebar_width) this.sidebarWidth = meta.sidebar_width;
     await this.refreshSidebar();
+    await this.refreshArchived();
     if (meta.last_open_job_id) {
       try { await this.openJob(meta.last_open_job_id); }
       catch { /* job may have been deleted */ }
