@@ -52,6 +52,23 @@
       <DetailsPanel />
     </aside>
   {/if}
+
+  {#if store.currentJob}
+    <div class="print-header">
+      <h1>{store.currentJob.name.toUpperCase()}</h1>
+      <div class="meta">
+        {#if store.currentJob.client}Client: {store.currentJob.client} · {/if}
+        {#if store.currentJob.address}Address: {store.currentJob.address} · {/if}
+        Printed: {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+      </div>
+    </div>
+    <div class="print-footer">
+      Public holidays in range:
+      {#each store.noWorkDays.filter(n => n.source === 'sa_public_holiday') as h, i (h.id)}
+        {h.date} ({h.reason}){i < store.noWorkDays.filter(n => n.source === 'sa_public_holiday').length - 1 ? ' · ' : ''}
+      {/each}
+    </div>
+  {/if}
 </div>
 
 <SavedIndicator />
@@ -98,4 +115,7 @@
     margin: 0 0 var(--sp-2);
     color: var(--c-text);
   }
+  .print-header h1 { font-size: 14pt; margin: 0; font-weight: 600; }
+  .print-header .meta { font-size: 9pt; color: #444; margin-top: 2mm; }
+  .print-footer { font-size: 9pt; color: #444; }
 </style>
