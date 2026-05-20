@@ -6,6 +6,7 @@
   import DetailsPanel from './lib/details/DetailsPanel.svelte';
   import SavedIndicator from './lib/footer/SavedIndicator.svelte';
   import PrintOptions from './lib/print/PrintOptions.svelte';
+  import Toast from './lib/components/Toast.svelte';
 
   onMount(async () => {
     await store.bootstrap();
@@ -72,6 +73,7 @@
 </div>
 
 <SavedIndicator />
+<Toast />
 
 {#if store.showPrintOptions}
   <PrintOptions />

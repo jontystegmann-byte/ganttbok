@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { store } from '../store.svelte';
   import * as ipc from '../ipc';
+  import { toast } from '../toast.svelte';
 
   function onMove(e: PointerEvent) {
     if (!store.depCreator) return;
@@ -23,8 +24,12 @@
       store.recordHistory();
       await ipc.touchLastSave();
     } catch (e) {
-      // Cycle rejected — silent for now, Toast in Task 16.
-      console.warn('dep rejected', e);
+      const msg = String((e as { message?: string }).message ?? e);
+      if (msg.toLowerCase().includes('cycle')) {
+        toast.show('error', "Can't create that — it would make a circular chain.");
+      } else {
+        toast.show('error', `Couldn't add dependency: ${msg}`);
+      }
     }
   }
 
