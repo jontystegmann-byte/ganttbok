@@ -1,13 +1,13 @@
 <script lang="ts">
-  import { state } from '../store.svelte';
+  import { store } from '../store.svelte';
   import TaskDetails from './TaskDetails.svelte';
   import PhaseDetails from './PhaseDetails.svelte';
 </script>
 
-{#if state.selection?.kind === 'task'}
-  <TaskDetails taskId={state.selection.id} />
-{:else if state.selection?.kind === 'phase'}
-  <PhaseDetails phaseId={state.selection.id} />
+{#if store.selection?.kind === 'task'}
+  <TaskDetails taskId={store.selection.id} />
+{:else if store.selection?.kind === 'phase'}
+  <PhaseDetails phaseId={store.selection.id} />
 {:else}
   <div class="empty">Select a bar to edit</div>
 {/if}

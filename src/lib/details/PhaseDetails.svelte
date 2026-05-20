@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { state } from '../store.svelte';
+  import { store } from '../store.svelte';
   import * as ipc from '../ipc';
   import type { Phase } from '../types';
 
   let { phaseId }: { phaseId: number } = $props();
-  const phase = $derived(state.phases.find(p => p.id === phaseId));
+  const phase = $derived(store.phases.find(p => p.id === phaseId));
 
   let name = $state('');
   let colour = $state('#3B82F6');
@@ -19,8 +19,8 @@
   async function save() {
     if (!phase) return;
     const updated: Phase = { ...phase, name: name.trim() || phase.name, colour };
-    await ipc.updatePhase($state.snapshot(updated));
-    state.phases = state.phases.map(p => p.id === updated.id ? updated : p);
+    await ipc.updatePhase($store.snapshot(updated));
+    store.phases = store.phases.map(p => p.id === updated.id ? updated : p);
     await ipc.touchLastSave();
   }
 
@@ -28,9 +28,9 @@
     if (!phase) return;
     if (!confirm(`Delete phase "${phase.name}" and ALL its tasks?`)) return;
     await ipc.deletePhase(phase.id);
-    state.phases = state.phases.filter(p => p.id !== phase.id);
-    state.tasks  = state.tasks.filter(t => t.phase_id !== phase.id);
-    state.select(null);
+    store.phases = store.phases.filter(p => p.id !== phase.id);
+    store.tasks  = store.tasks.filter(t => t.phase_id !== phase.id);
+    store.select(null);
     await ipc.touchLastSave();
   }
 </script>

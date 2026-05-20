@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Dependency, Task } from '../types';
   import { addWorkdays } from '../calendar';
-  import { state } from '../store.svelte';
+  import { store } from '../store.svelte';
 
   let { dep, tasks, rowIndex, days }: {
     dep: Dependency;
@@ -32,7 +32,7 @@
   });
 
   const isLit = $derived(
-    state.hoveredTaskId === dep.predecessor_id || state.hoveredTaskId === dep.successor_id
+    store.hoveredTaskId === dep.predecessor_id || store.hoveredTaskId === dep.successor_id
   );
 </script>
 

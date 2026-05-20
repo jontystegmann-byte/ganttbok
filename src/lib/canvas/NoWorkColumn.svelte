@@ -1,11 +1,11 @@
 <script lang="ts">
   import type { ViewportDay } from '../calendar';
-  import { state } from '../store.svelte';
+  import { store } from '../store.svelte';
   let { days, totalHeight }: { days: ViewportDay[]; totalHeight: number } = $props();
 
   const noWorkByDate = $derived.by(() => {
     const m = new Map<string, string>();
-    for (const n of state.noWorkDays) m.set(n.date, n.reason);
+    for (const n of store.noWorkDays) m.set(n.date, n.reason);
     return m;
   });
 </script>

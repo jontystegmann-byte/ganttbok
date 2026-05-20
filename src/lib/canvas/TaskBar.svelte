@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Task, Phase } from '../types';
-  import { state } from '../store.svelte';
+  import { store } from '../store.svelte';
   import { hitZone } from '../hit-test';
 
   let { task, phase, days, row }: {
@@ -10,12 +10,12 @@
   const xStart = $derived(days.findIndex(d => d.date === task.start_date) * 24);
   const w = $derived(task.duration_workdays * 24);
   const y = $derived(row * 32 + 6);
-  const isSelected = $derived(state.selection?.kind === 'task' && state.selection.id === task.id);
-  const isDragging = $derived(state.dragState?.taskId === task.id);
+  const isSelected = $derived(store.selection?.kind === 'task' && store.selection.id === task.id);
+  const isDragging = $derived(store.dragState?.taskId === task.id);
 
   const livePreview = $derived.by(() => {
-    if (!isDragging || !state.dragState) return { x: xStart, w };
-    const d = state.dragState;
+    if (!isDragging || !store.dragState) return { x: xStart, w };
+    const d = store.dragState;
     if (d.zone === 'move')         return { x: xStart + d.liveDelta, w };
     if (d.zone === 'resize-end')   return { x: xStart, w: Math.max(24, w + d.liveDelta) };
     if (d.zone === 'resize-start') return { x: xStart + d.liveDelta, w: Math.max(24, w - d.liveDelta) };
@@ -24,11 +24,11 @@
 
   function onPointerDown(e: PointerEvent) {
     e.stopPropagation();
-    state.select({ kind: 'task', id: task.id });
+    store.select({ kind: 'task', id: task.id });
     const rect = (e.currentTarget as Element).getBoundingClientRect();
     const relX = e.clientX - rect.left;
     const zone = hitZone({ relX, width: w });
-    state.dragState = {
+    store.dragState = {
       taskId: task.id,
       zone,
       startX: e.clientX,
@@ -41,10 +41,10 @@
 
 <g
   class="task-bar"
-  data-zone={state.dragState?.taskId === task.id ? state.dragState.zone : null}
+  data-zone={store.dragState?.taskId === task.id ? store.dragState.zone : null}
   onpointerdown={onPointerDown}
-  onmouseenter={() => state.hoveredTaskId = task.id}
-  onmouseleave={() => state.hoveredTaskId = null}
+  onmouseenter={() => store.hoveredTaskId = task.id}
+  onmouseleave={() => store.hoveredTaskId = null}
   role="button"
   tabindex="0"
 >

@@ -144,4 +144,4 @@ class Store {
   }
 }
 
-export const state = new Store();
+export const store = new Store();

@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { state } from '../store.svelte';
+  import { store } from '../store.svelte';
   import * as ipc from '../ipc';
   import type { Task } from '../types';
 
   let { taskId }: { taskId: number } = $props();
-  const task = $derived(state.tasks.find(t => t.id === taskId));
+  const task = $derived(store.tasks.find(t => t.id === taskId));
 
   let name = $state('');
   let duration = $state(1);
@@ -26,8 +26,8 @@
       duration_workdays: Math.max(1, duration),
       notes: notes.trim() || null,
     };
-    await ipc.updateTask($state.snapshot(updated));
-    state.tasks = state.tasks.map(t => t.id === updated.id ? updated : t);
+    await ipc.updateTask($store.snapshot(updated));
+    store.tasks = store.tasks.map(t => t.id === updated.id ? updated : t);
     await ipc.touchLastSave();
   }
 
@@ -35,8 +35,8 @@
     if (!task) return;
     if (!confirm(`Delete task "${task.name}"?`)) return;
     await ipc.deleteTask(task.id);
-    state.tasks = state.tasks.filter(t => t.id !== task.id);
-    state.select(null);
+    store.tasks = store.tasks.filter(t => t.id !== task.id);
+    store.select(null);
     await ipc.touchLastSave();
   }
 </script>

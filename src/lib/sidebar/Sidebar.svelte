@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { state } from '../store.svelte';
+  import { store } from '../store.svelte';
   import JobItem from './JobItem.svelte';
   import NewJobModal from './NewJobModal.svelte';
   import ArchivedGroup from './ArchivedGroup.svelte';
@@ -9,7 +9,7 @@
   <header><h2>Gantt Bok</h2></header>
   <section>
     <h3>Active</h3>
-    {#each state.jobs as job (job.id)}
+    {#each store.jobs as job (job.id)}
       <JobItem {job} />
     {:else}
       <p class="hint">No jobs yet</p>
@@ -17,11 +17,11 @@
   </section>
   <ArchivedGroup />
   <footer>
-    <button class="new-job" onclick={() => state.showNewJobModal = true}>+ New job</button>
+    <button class="new-job" onclick={() => store.showNewJobModal = true}>+ New job</button>
   </footer>
 </div>
 
-{#if state.showNewJobModal}
+{#if store.showNewJobModal}
   <NewJobModal />
 {/if}
 

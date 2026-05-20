@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { state } from '../store.svelte';
+  import { store } from '../store.svelte';
   import HeaderStrip from './HeaderStrip.svelte';
   import LeftRail from './LeftRail.svelte';
   import NoWorkColumn from './NoWorkColumn.svelte';
@@ -12,10 +12,10 @@
   import * as ipc from '../ipc';
 
   const days = $derived.by(() => {
-    if (!state.currentJob) return [];
+    if (!store.currentJob) return [];
     return computeViewportDays(
-      state.currentJob.project_start_date,
-      state.tasks,
+      store.currentJob.project_start_date,
+      store.tasks,
     );
   });
 
@@ -25,10 +25,10 @@
 
   const rows = $derived.by((): Row[] => {
     const out: Row[] = [];
-    for (const phase of state.phases) {
+    for (const phase of store.phases) {
       out.push({ kind: 'phase', phase });
       if (!phase.collapsed) {
-        for (const task of (state.tasksByPhase.get(phase.id) ?? [])) {
+        for (const task of (store.tasksByPhase.get(phase.id) ?? [])) {
           out.push({ kind: 'task', task, phase });
         }
       }
@@ -58,7 +58,7 @@
         width={days.length * CELL}
         height={totalHeight}
         class="canvas-svg"
-        onclick={() => state.select(null)}
+        onclick={() => store.select(null)}
         ondblclick={async (e) => {
           const svgRect = (e.currentTarget as SVGElement).getBoundingClientRect();
           const x = e.clientX - svgRect.left;
@@ -76,7 +76,7 @@
           const task = await ipc.createTask({
             phase_id: phaseId, name: name.trim(), start_date: date, duration_workdays: 1,
           });
-          state.tasks = [...state.tasks, task];
+          store.tasks = [...store.tasks, task];
           await ipc.touchLastSave();
         }}
       >
@@ -87,13 +87,13 @@
         </defs>
         {#each rows as r, ri (r.kind === 'phase' ? `p${r.phase.id}` : `t${r.task.id}`)}
           {#if r.kind === 'phase' && r.phase.collapsed}
-            <PhaseBar phase={r.phase} tasks={state.tasksByPhase.get(r.phase.id) ?? []} {days} row={ri} />
+            <PhaseBar phase={r.phase} tasks={store.tasksByPhase.get(r.phase.id) ?? []} {days} row={ri} />
           {:else if r.kind === 'task'}
             <TaskBar task={r.task} phase={r.phase} {days} row={ri} />
           {/if}
         {/each}
-        {#each state.dependencies as dep (dep.id)}
-          <DependencyArrow {dep} tasks={state.tasks} rowIndex={rowIndexMap} {days} />
+        {#each store.dependencies as dep (dep.id)}
+          <DependencyArrow {dep} tasks={store.tasks} rowIndex={rowIndexMap} {days} />
         {/each}
       </svg>
     </div>

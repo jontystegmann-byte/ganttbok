@@ -1,22 +1,22 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { state } from './lib/store.svelte';
+  import { store } from './lib/store.svelte';
   import Sidebar from './lib/sidebar/Sidebar.svelte';
   import GanttCanvas from './lib/canvas/GanttCanvas.svelte';
   import DetailsPanel from './lib/details/DetailsPanel.svelte';
 
   onMount(async () => {
-    await state.bootstrap();
+    await store.bootstrap();
   });
 </script>
 
 <div class="app-shell">
-  <aside class="sidebar" style="width: {state.sidebarWidth}px">
+  <aside class="sidebar" style="width: {store.sidebarWidth}px">
     <Sidebar />
   </aside>
 
   <main class="canvas-pane">
-    {#if state.currentJob}
+    {#if store.currentJob}
       <GanttCanvas />
     {:else}
       <div class="empty-state">
@@ -26,7 +26,7 @@
     {/if}
   </main>
 
-  {#if state.selection}
+  {#if store.selection}
     <aside class="details">
       <DetailsPanel />
     </aside>

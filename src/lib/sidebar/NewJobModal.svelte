@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { state } from '../store.svelte';
+  import { store } from '../store.svelte';
 
   let name = $state('');
   let client = $state('');
@@ -12,7 +12,7 @@
     if (!name.trim()) return;
     submitting = true;
     try {
-      await state.createJob({
+      await store.createJob({
         name: name.trim(),
         client: client.trim() || null,
         address: address.trim() || null,
@@ -23,7 +23,7 @@
     }
   }
 
-  function cancel() { state.showNewJobModal = false; }
+  function cancel() { store.showNewJobModal = false; }
 </script>
 
 <div class="backdrop" onclick={cancel} role="presentation"></div>

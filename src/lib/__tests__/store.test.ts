@@ -12,28 +12,28 @@ vi.mock('../ipc', () => ({
   setLastOpenJob: vi.fn(async () => {}),
 }));
 
-import { state } from '../store.svelte';
+import { store } from '../store.svelte';
 
 describe('Store', () => {
   beforeEach(() => {
-    state.tasks = [];
-    state.selection = null;
+    store.tasks = [];
+    store.selection = null;
   });
 
   it('applyDragResult patches tasks by id', () => {
-    state.tasks = [
+    store.tasks = [
       { id: 1, phase_id: 1, name: 'A', start_date: '2026-06-08', duration_workdays: 1, order_index: 0, notes: null },
       { id: 2, phase_id: 1, name: 'B', start_date: '2026-06-09', duration_workdays: 1, order_index: 1, notes: null },
     ];
-    state.applyDragResult([
+    store.applyDragResult([
       { id: 1, phase_id: 1, name: 'A', start_date: '2026-06-10', duration_workdays: 1, order_index: 0, notes: null },
     ]);
-    expect(state.tasks[0].start_date).toBe('2026-06-10');
-    expect(state.tasks[1].start_date).toBe('2026-06-09'); // untouched
+    expect(store.tasks[0].start_date).toBe('2026-06-10');
+    expect(store.tasks[1].start_date).toBe('2026-06-09'); // untouched
   });
 
   it('select stores the selection', () => {
-    state.select({ kind: 'task', id: 42 });
-    expect(state.selection).toEqual({ kind: 'task', id: 42 });
+    store.select({ kind: 'task', id: 42 });
+    expect(store.selection).toEqual({ kind: 'task', id: 42 });
   });
 });

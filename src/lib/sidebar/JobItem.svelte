@@ -1,9 +1,9 @@
 <script lang="ts">
   import type { Job } from '../types';
-  import { state } from '../store.svelte';
+  import { store } from '../store.svelte';
   let { job }: { job: Job } = $props();
-  const isOpen = $derived(state.currentJob?.id === job.id);
-  async function open() { await state.openJob(job.id); }
+  const isOpen = $derived(store.currentJob?.id === job.id);
+  async function open() { await store.openJob(job.id); }
 </script>
 
 <button class="job-item" class:open={isOpen} onclick={open}>

@@ -1,15 +1,15 @@
 <script lang="ts">
-  import { state } from '../store.svelte';
+  import { store } from '../store.svelte';
   import JobItem from './JobItem.svelte';
   let expanded = $state(false);
 </script>
 
 <section>
   <button class="header" onclick={() => expanded = !expanded}>
-    {expanded ? '▾' : '▸'} Archived ({state.archivedJobs.length})
+    {expanded ? '▾' : '▸'} Archived ({store.archivedJobs.length})
   </button>
   {#if expanded}
-    {#each state.archivedJobs as job (job.id)}
+    {#each store.archivedJobs as job (job.id)}
       <JobItem {job} />
     {:else}
       <p class="hint">No archived jobs</p>

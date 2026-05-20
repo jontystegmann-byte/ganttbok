@@ -1,17 +1,17 @@
 <script lang="ts">
-  import { state } from '../store.svelte';
+  import { store } from '../store.svelte';
   import * as ipc from '../ipc';
 
   async function toggleCollapse(phaseId: number) {
-    const phase = state.phases.find(p => p.id === phaseId);
+    const phase = store.phases.find(p => p.id === phaseId);
     if (!phase) return;
     phase.collapsed = !phase.collapsed;
-    await ipc.updatePhase($state.snapshot(phase));
+    await ipc.updatePhase($store.snapshot(phase));
   }
 </script>
 
 <div class="left-rail">
-  {#each state.phases as phase, pi (phase.id)}
+  {#each store.phases as phase, pi (phase.id)}
     <div class="phase-row"
       style="height: var(--row-height);"
       draggable="true"
@@ -21,20 +21,20 @@
         e.preventDefault();
         const draggedId = Number(e.dataTransfer!.getData('text/phase-id'));
         if (!draggedId || draggedId === phase.id) return;
-        const ordered = state.phases.map(p => p.id).filter(id => id !== draggedId);
-        const targetIdx = state.phases.findIndex(p => p.id === phase.id);
+        const ordered = store.phases.map(p => p.id).filter(id => id !== draggedId);
+        const targetIdx = store.phases.findIndex(p => p.id === phase.id);
         ordered.splice(targetIdx, 0, draggedId);
-        await state.reorderPhases(ordered);
+        await store.reorderPhases(ordered);
       }}
     >
       <button class="chev" onclick={() => toggleCollapse(phase.id)} aria-label="toggle">
         {phase.collapsed ? '▸' : '▾'}
       </button>
       <span class="num">{pi + 1}.</span>
-      <span class="name" onclick={() => state.select({ kind: 'phase', id: phase.id })} role="button" tabindex="0">{phase.name}</span>
+      <span class="name" onclick={() => store.select({ kind: 'phase', id: phase.id })} role="button" tabindex="0">{phase.name}</span>
     </div>
     {#if !phase.collapsed}
-      {@const phaseTasks = state.tasksByPhase.get(phase.id) ?? []}
+      {@const phaseTasks = store.tasksByPhase.get(phase.id) ?? []}
       {#each phaseTasks as task, ti (task.id)}
         <div class="task-row"
           style="height: var(--row-height);"
@@ -45,28 +45,28 @@
             e.preventDefault();
             const draggedId = Number(e.dataTransfer!.getData('text/task-id'));
             if (!draggedId || draggedId === task.id) return;
-            const targetTasks = state.tasksByPhase.get(phase.id) ?? [];
+            const targetTasks = store.tasksByPhase.get(phase.id) ?? [];
             // Only reorder within same phase.
             if (!targetTasks.some(t => t.id === draggedId)) return;
             const ordered = targetTasks.map(t => t.id).filter(id => id !== draggedId);
             const targetIdx = targetTasks.findIndex(t => t.id === task.id);
             ordered.splice(targetIdx, 0, draggedId);
-            await state.reorderTasksInPhase(phase.id, ordered);
+            await store.reorderTasksInPhase(phase.id, ordered);
           }}
         >
           <span class="num">{pi + 1}.{ti + 1}</span>
-          <span class="name" onclick={() => state.select({ kind: 'task', id: task.id })} role="button" tabindex="0">{task.name}</span>
+          <span class="name" onclick={() => store.select({ kind: 'task', id: task.id })} role="button" tabindex="0">{task.name}</span>
         </div>
       {/each}
       <button class="add-task" onclick={async () => {
         const n = prompt('Task name?');
-        if (n?.trim()) await state.createTaskInPhase(phase.id, n.trim());
+        if (n?.trim()) await store.createTaskInPhase(phase.id, n.trim());
       }}>+ Task</button>
     {/if}
   {/each}
   <button class="add-phase" onclick={async () => {
     const n = prompt('Phase name?');
-    if (n?.trim()) await state.createPhase(n.trim());
+    if (n?.trim()) await store.createPhase(n.trim());
   }}>+ Phase</button>
 </div>
 
