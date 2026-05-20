@@ -49,6 +49,10 @@ pub fn run() {
             commands::dependency::create_dependency,
             commands::dependency::update_dependency_lag,
             commands::dependency::delete_dependency,
+            commands::no_work_day::list_no_work_days,
+            commands::no_work_day::add_manual_no_work_day,
+            commands::no_work_day::delete_no_work_day,
+            commands::no_work_day::sync_sa_holidays,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,0 +1,129 @@
+use chrono::NaiveDate;
+use rusqlite::{Connection, params};
+use crate::calendar::sa_holidays::sa_holidays_for_range;
+use crate::db::models::{NoWorkDay, NewNoWorkDay};
+use crate::{GbError, GbResult};
+
+pub fn list_for_job(conn: &Connection, job_id: i64) -> GbResult<Vec<NoWorkDay>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, job_id, date, reason, source FROM no_work_day WHERE job_id = ?1 ORDER BY date",
+    )?;
+    let rows = stmt.query_map([job_id], row_to_nwd)?;
+    let mut out = Vec::new();
+    for r in rows { out.push(r?); }
+    Ok(out)
+}
+
+pub fn create(conn: &Connection, new: &NewNoWorkDay) -> GbResult<NoWorkDay> {
+    conn.execute(
+        "INSERT INTO no_work_day (job_id, date, reason, source)
+         VALUES (?1, ?2, ?3, ?4)
+         ON CONFLICT(job_id, date) DO UPDATE SET reason = excluded.reason, source = excluded.source",
+        params![new.job_id, new.date.to_string(), new.reason, new.source],
+    )?;
+    let id = conn.last_insert_rowid();
+    conn.query_row(
+        "SELECT id, job_id, date, reason, source FROM no_work_day WHERE id = ?1",
+        [id],
+        row_to_nwd,
+    ).map_err(GbError::from)
+}
+
+pub fn delete(conn: &Connection, id: i64) -> GbResult<()> {
+    let n = conn.execute("DELETE FROM no_work_day WHERE id = ?1", [id])?;
+    if n == 0 { return Err(GbError::NotFound(format!("no_work_day {id}"))); }
+    Ok(())
+}
+
+/// Insert SA public holidays into `no_work_day` for [from..to] inclusive, *without overwriting* manual entries.
+pub fn sync_sa_holidays(conn: &Connection, job_id: i64, from: NaiveDate, to: NaiveDate) -> GbResult<i64> {
+    let mut inserted: i64 = 0;
+    let tx = conn.unchecked_transaction()?;
+
+    tx.execute(
+        "DELETE FROM no_work_day WHERE job_id = ?1 AND source = 'sa_public_holiday'
+                                AND date >= ?2 AND date <= ?3",
+        params![job_id, from.to_string(), to.to_string()],
+    )?;
+
+    for h in sa_holidays_for_range(from, to) {
+        let manual_exists: i64 = tx.query_row(
+            "SELECT COUNT(*) FROM no_work_day WHERE job_id = ?1 AND date = ?2 AND source = 'manual'",
+            params![job_id, h.date.to_string()],
+            |r| r.get(0),
+        )?;
+        if manual_exists == 0 {
+            tx.execute(
+                "INSERT INTO no_work_day (job_id, date, reason, source)
+                 VALUES (?1, ?2, ?3, 'sa_public_holiday')",
+                params![job_id, h.date.to_string(), h.name],
+            )?;
+            inserted += 1;
+        }
+    }
+    tx.commit()?;
+    Ok(inserted)
+}
+
+fn row_to_nwd(r: &rusqlite::Row) -> rusqlite::Result<NoWorkDay> {
+    let date_str: String = r.get(2)?;
+    let date = NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
+        .map_err(|e| rusqlite::Error::FromSqlConversionFailure(2, rusqlite::types::Type::Text, Box::new(e)))?;
+    Ok(NoWorkDay {
+        id: r.get(0)?,
+        job_id: r.get(1)?,
+        date,
+        reason: r.get(3)?,
+        source: r.get(4)?,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::connection::open_in_memory;
+    use crate::db::models::NewJob;
+    use crate::repo::job;
+
+    #[test]
+    fn sync_2026_inserts_twelve_holidays() {
+        let conn = open_in_memory().unwrap();
+        let j = job::create(&conn, &NewJob {
+            name: "J".into(), client: None, address: None,
+            project_start_date: NaiveDate::from_ymd_opt(2026,1,1).unwrap(),
+            is_template: false,
+        }).unwrap();
+        let n = sync_sa_holidays(
+            &conn, j.id,
+            NaiveDate::from_ymd_opt(2026,1,1).unwrap(),
+            NaiveDate::from_ymd_opt(2026,12,31).unwrap(),
+        ).unwrap();
+        assert_eq!(n, 12);
+    }
+
+    #[test]
+    fn sync_does_not_overwrite_manual_entries() {
+        let conn = open_in_memory().unwrap();
+        let j = job::create(&conn, &NewJob {
+            name: "J".into(), client: None, address: None,
+            project_start_date: NaiveDate::from_ymd_opt(2026,1,1).unwrap(),
+            is_template: false,
+        }).unwrap();
+        create(&conn, &NewNoWorkDay {
+            job_id: j.id,
+            date: NaiveDate::from_ymd_opt(2026, 6, 16).unwrap(),
+            reason: "Team building".into(),
+            source: "manual".into(),
+        }).unwrap();
+        let n = sync_sa_holidays(
+            &conn, j.id,
+            NaiveDate::from_ymd_opt(2026,1,1).unwrap(),
+            NaiveDate::from_ymd_opt(2026,12,31).unwrap(),
+        ).unwrap();
+        assert_eq!(n, 11);
+        let list = list_for_job(&conn, j.id).unwrap();
+        let youth_day = list.iter().find(|r| r.date == NaiveDate::from_ymd_opt(2026,6,16).unwrap()).unwrap();
+        assert_eq!(youth_day.source, "manual");
+        assert_eq!(youth_day.reason, "Team building");
+    }
+}
