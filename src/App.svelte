@@ -7,6 +7,22 @@
 
   onMount(async () => {
     await store.bootstrap();
+
+    function onKey(e: KeyboardEvent) {
+      const meta = e.metaKey || e.ctrlKey;
+      if (!meta) return;
+      if (e.key === 'z' && !e.shiftKey) {
+        if (store.canUndo()) { e.preventDefault(); store.undo(); }
+      } else if (e.key === 'Z' || (e.key === 'z' && e.shiftKey)) {
+        if (store.canRedo()) { e.preventDefault(); store.redo(); }
+      } else if (e.key === 's') {
+        e.preventDefault();
+        void store.resyncJobState();
+      }
+    }
+
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   });
 </script>
 

@@ -86,7 +86,15 @@ class Store {
   }
 
   async resyncJobState(): Promise<void> {
-    // Task 3 implements the real backend resync. Stub for Task 2.
+    if (!this.currentJob) return;
+    await ipc.resyncJobState({
+      job_id: this.currentJob.id,
+      phases: $state.snapshot(this.phases),
+      tasks: $state.snapshot(this.tasks),
+      dependencies: $state.snapshot(this.dependencies),
+      no_work_days: $state.snapshot(this.noWorkDays),
+    });
+    await ipc.touchLastSave();
     this.hasUnsavedUndo = false;
   }
 

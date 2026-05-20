@@ -59,6 +59,7 @@ pub fn run() {
             commands::meta::set_last_open_job,
             commands::meta::set_sidebar_width,
             commands::meta::touch_last_save,
+            commands::sync::resync_job_state,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
