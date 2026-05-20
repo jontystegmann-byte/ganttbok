@@ -5,6 +5,7 @@
   import GanttCanvas from './lib/canvas/GanttCanvas.svelte';
   import DetailsPanel from './lib/details/DetailsPanel.svelte';
   import SavedIndicator from './lib/footer/SavedIndicator.svelte';
+  import PrintOptions from './lib/print/PrintOptions.svelte';
 
   onMount(async () => {
     await store.bootstrap();
@@ -19,6 +20,9 @@
       } else if (e.key === 's') {
         e.preventDefault();
         void store.resyncJobState();
+      } else if (e.key === 'p') {
+        e.preventDefault();
+        store.showPrintOptions = true;
       }
     }
 
@@ -51,6 +55,10 @@
 </div>
 
 <SavedIndicator />
+
+{#if store.showPrintOptions}
+  <PrintOptions />
+{/if}
 
 <style>
   .app-shell {

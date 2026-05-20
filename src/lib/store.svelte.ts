@@ -40,6 +40,21 @@ class Store {
   hasUnsavedUndo = $state<boolean>(false);
   private resyncTimer: number | null = null;
 
+  // Print
+  showPrintOptions = $state<boolean>(false);
+  printScaling     = $state<'fit' | 'multi'>('fit');
+  printShowNotes   = $state<boolean>(false);
+
+  // Dep creation gesture
+  depCreator = $state<{
+    fromTaskId: number;
+    fromX: number;
+    fromY: number;
+    mouseX: number;
+    mouseY: number;
+    hoverTaskId: number | null;
+  } | null>(null);
+
   cancelDrag(): void {
     this.dragState = null;
   }
