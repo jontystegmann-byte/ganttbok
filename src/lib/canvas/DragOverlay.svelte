@@ -22,6 +22,24 @@
     if (deltaWorkdays === 0) return;
     if (!store.currentJob) return;
 
+    if (d.taskId < 0) {
+      // Phase drag — shift every task in the phase.
+      const phaseId = -d.taskId;
+      const phaseTasks = store.tasksByPhase.get(phaseId) ?? [];
+      for (const t of phaseTasks) {
+        const newStart = addWorkdays(t.start_date, deltaWorkdays);
+        await ipc.dragTask({
+          job_id: store.currentJob.id,
+          task_id: t.id,
+          new_start_date: newStart,
+        });
+      }
+      await ipc.touchLastSave();
+      // Reload state from backend to pick up all ripples.
+      await store.openJob(store.currentJob.id);
+      return;
+    }
+
     const task = store.tasks.find(t => t.id === d.taskId);
     if (!task) return;
 
