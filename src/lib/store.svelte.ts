@@ -22,6 +22,7 @@ class Store {
   sidebarWidth  = $state<number>(240);
   showNewJobModal = $state<boolean>(false);
   archivedJobs = $state<Job[]>([]);
+  hoveredTaskId = $state<number | null>(null);
 
   async refreshArchived(): Promise<void> {
     // Backend doesn't have a list_archived command; fetch all by toggling and use a generic.
