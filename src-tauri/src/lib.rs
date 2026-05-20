@@ -25,7 +25,13 @@ pub fn run() {
     tauri::Builder::default()
         .manage(db)
         .invoke_handler(tauri::generate_handler![
-            // (command list grows task-by-task — left empty for now)
+            commands::job::list_jobs,
+            commands::job::list_templates,
+            commands::job::get_job,
+            commands::job::create_job,
+            commands::job::update_job,
+            commands::job::archive_job,
+            commands::job::delete_job,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
