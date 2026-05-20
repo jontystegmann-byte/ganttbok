@@ -1,13 +1,74 @@
 <script lang="ts">
-  let name = "Gantt Bok";
+  import { onMount } from 'svelte';
+  import { state } from './lib/store.svelte';
+  import Sidebar from './lib/sidebar/Sidebar.svelte';
+  import GanttCanvas from './lib/canvas/GanttCanvas.svelte';
+  import DetailsPanel from './lib/details/DetailsPanel.svelte';
+
+  onMount(async () => {
+    await state.bootstrap();
+  });
 </script>
 
-<main>
-  <h1>{name}</h1>
-  <p>Backend foundation in progress. UI lands in Plan 2.</p>
-</main>
+<div class="app-shell">
+  <aside class="sidebar" style="width: {state.sidebarWidth}px">
+    <Sidebar />
+  </aside>
+
+  <main class="canvas-pane">
+    {#if state.currentJob}
+      <GanttCanvas />
+    {:else}
+      <div class="empty-state">
+        <h1>Gantt Bok</h1>
+        <p>Pick a job from the left, or create a new one.</p>
+      </div>
+    {/if}
+  </main>
+
+  {#if state.selection}
+    <aside class="details">
+      <DetailsPanel />
+    </aside>
+  {/if}
+</div>
 
 <style>
-  main { font-family: -apple-system, system-ui, sans-serif; padding: 2rem; }
-  h1   { font-weight: 600; }
+  .app-shell {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    height: 100vh;
+    overflow: hidden;
+  }
+  .sidebar {
+    border-right: 1px solid var(--c-border);
+    background: var(--c-panel);
+    overflow-y: auto;
+    min-width: 180px;
+    max-width: 480px;
+  }
+  .canvas-pane {
+    overflow: auto;
+    background: var(--c-bg);
+  }
+  .details {
+    width: var(--details-width);
+    border-left: 1px solid var(--c-border);
+    background: var(--c-panel);
+    overflow-y: auto;
+  }
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--c-text-muted);
+  }
+  .empty-state h1 {
+    font-size: var(--font-size-xl);
+    font-weight: 600;
+    margin: 0 0 var(--sp-2);
+    color: var(--c-text);
+  }
 </style>
