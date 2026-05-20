@@ -23,7 +23,15 @@ pub fn run() {
     let conn = db::connection::open(&db_path()).expect("failed to open db");
     let db = Db::new(conn);
 
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+    #[cfg(desktop)]
+    {
+        builder = builder
+            .plugin(tauri_plugin_updater::Builder::new().build())
+            .plugin(tauri_plugin_process::init());
+    }
+
+    builder
         .manage(db)
         .invoke_handler(tauri::generate_handler![
             commands::job::list_jobs,
