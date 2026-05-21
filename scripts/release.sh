@@ -13,7 +13,11 @@ cd "$(dirname "$0")/.."
 
 REPO="jontystegmann-byte/ganttbok"
 KEY_PATH="${TAURI_SIGNING_PRIVATE_KEY_PATH:-$HOME/.tauri/ganttbok.key}"
-export TAURI_SIGNING_PRIVATE_KEY_PATH="$KEY_PATH"
+if [ ! -f "$KEY_PATH" ]; then
+  echo "❌ Signing key not found at $KEY_PATH"
+  exit 1
+fi
+export TAURI_SIGNING_PRIVATE_KEY="$(cat "$KEY_PATH")"
 export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}"
 
 VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
@@ -49,27 +53,23 @@ build_target aarch64-apple-darwin
 assets_dir="$(mktemp -d)"
 echo "==> Collecting artifacts into $assets_dir"
 
-declare -A PLATFORM_TAR
-declare -A PLATFORM_SIG
-
 collect() {
   local TRIPLE="$1"
   local PLATFORM_KEY="$2"
   local BUNDLE_DIR="src-tauri/target/$TRIPLE/release/bundle"
-  local TAR=$(ls "$BUNDLE_DIR/macos/"*.app.tar.gz | head -1)
-  local SIG="${TAR}.sig"
-  local DMG=$(ls "$BUNDLE_DIR/dmg/"*.dmg | head -1)
+  local TAR_SRC=$(ls "$BUNDLE_DIR/macos/"*.app.tar.gz | head -1)
+  local SIG_SRC="${TAR_SRC}.sig"
+  local DMG_SRC=$(ls "$BUNDLE_DIR/dmg/"*.dmg | head -1)
   local DMG_OUT="$assets_dir/Gantt_Bok_${VERSION}_${PLATFORM_KEY}.dmg"
   local TAR_OUT="$assets_dir/Gantt_Bok_${VERSION}_${PLATFORM_KEY}.app.tar.gz"
-  cp "$DMG" "$DMG_OUT"
-  cp "$TAR" "$TAR_OUT"
-  cp "$SIG" "$TAR_OUT.sig"
-  PLATFORM_TAR[$PLATFORM_KEY]="$TAR_OUT"
-  PLATFORM_SIG[$PLATFORM_KEY]="$(cat "$SIG")"
+  cp "$DMG_SRC" "$DMG_OUT"
+  cp "$TAR_SRC" "$TAR_OUT"
+  cp "$SIG_SRC" "$TAR_OUT.sig"
+  echo "$TAR_OUT"
 }
 
-collect x86_64-apple-darwin   darwin-x86_64
-collect aarch64-apple-darwin  darwin-aarch64
+TAR_X86="$(collect x86_64-apple-darwin   darwin-x86_64)"
+TAR_ARM="$(collect aarch64-apple-darwin  darwin-aarch64)"
 
 LATEST_JSON="$assets_dir/latest.json"
 export GB_VERSION="$VERSION"
@@ -77,10 +77,10 @@ export GB_PUB_DATE="$PUB_DATE"
 export GB_REPO="$REPO"
 export GB_TAG="$TAG"
 export GB_NOTES="$(cat "$NOTES_FILE")"
-export GB_TAR_X86="$(basename "${PLATFORM_TAR[darwin-x86_64]}")"
-export GB_TAR_ARM="$(basename "${PLATFORM_TAR[darwin-aarch64]}")"
-export GB_SIG_X86="$(cat "${PLATFORM_TAR[darwin-x86_64]}.sig")"
-export GB_SIG_ARM="$(cat "${PLATFORM_TAR[darwin-aarch64]}.sig")"
+export GB_TAR_X86="$(basename "$TAR_X86")"
+export GB_TAR_ARM="$(basename "$TAR_ARM")"
+export GB_SIG_X86="$(cat "${TAR_X86}.sig")"
+export GB_SIG_ARM="$(cat "${TAR_ARM}.sig")"
 node -e '
 const fs = require("fs");
 const base = `https://github.com/${process.env.GB_REPO}/releases/download/${process.env.GB_TAG}`;
