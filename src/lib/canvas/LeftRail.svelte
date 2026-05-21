@@ -115,7 +115,12 @@
     border-bottom: 1px solid var(--c-border);
     font-size: var(--font-size-sm);
     box-sizing: border-box;
+    user-select: none;
+    cursor: grab;
   }
+  .phase-row:active, .task-row:active { cursor: grabbing; }
+  .phase-row { background: var(--c-panel); }
+  .phase-row.drag-over { background: var(--c-accent-fade); }
   .task-row { padding-left: calc(var(--sp-2) * 4); color: var(--c-text-muted); }
   .chev {
     background: transparent; border: none; cursor: pointer;

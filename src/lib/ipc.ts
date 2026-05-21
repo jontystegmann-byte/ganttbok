@@ -58,6 +58,8 @@ export const setSidebarWidth    = (width: number)                    => invoke<v
 export const touchLastSave      = ()                                 => invoke<void>('touch_last_save');
 export const setDurationUnit    = (unit: 'weeks' | 'days')           => invoke<void>('set_duration_unit', { unit });
 export const setHolidaysBlockWorkDefault = (value: boolean)          => invoke<void>('set_holidays_block_work_default', { value });
+export const setIncludeWeekends = (value: boolean)                   => invoke<void>('set_include_weekends', { value });
+export const setUiScale         = (value: number)                    => invoke<void>('set_ui_scale', { value });
 
 // Resync (used by undo/redo + manual ⌘S to push local state to backend in one transaction)
 export interface ResyncArgs {

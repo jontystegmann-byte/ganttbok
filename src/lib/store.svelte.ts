@@ -48,10 +48,24 @@ class Store {
   // User prefs
   durationUnit = $state<'weeks' | 'days'>('weeks');
   holidaysBlockWorkDefault = $state<boolean>(true);
+  includeWeekends = $state<boolean>(false);
+  uiScale = $state<number>(1);
+  hoveredDayIndex = $state<number | null>(null);
 
   async toggleDurationUnit(): Promise<void> {
     this.durationUnit = this.durationUnit === 'weeks' ? 'days' : 'weeks';
     await ipc.setDurationUnit(this.durationUnit);
+  }
+
+  async setIncludeWeekends(value: boolean): Promise<void> {
+    this.includeWeekends = value;
+    await ipc.setIncludeWeekends(value);
+  }
+
+  async setUiScale(value: number): Promise<void> {
+    this.uiScale = value;
+    document.documentElement.style.setProperty('--ui-scale', String(value));
+    await ipc.setUiScale(value);
   }
 
   // Dep creation gesture
@@ -148,6 +162,22 @@ class Store {
     await ipc.setHolidaysBlockWorkDefault(value);
   }
 
+  async renameCurrentJob(newName: string): Promise<void> {
+    if (!this.currentJob) return;
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === this.currentJob.name) return;
+    this.currentJob.name = trimmed;
+    await ipc.updateJob($state.snapshot(this.currentJob));
+    await this.refreshSidebar();
+  }
+
+  async setCurrentJobStartDate(newDate: string): Promise<void> {
+    if (!this.currentJob) return;
+    if (newDate === this.currentJob.project_start_date) return;
+    this.currentJob.project_start_date = newDate;
+    await ipc.updateJob($state.snapshot(this.currentJob));
+  }
+
   async createFromTemplate(
     templateId: number,
     args: { new_name: string; client: string | null; address: string | null; project_start_date: string },
@@ -177,6 +207,11 @@ class Store {
     if (meta.sidebar_width) this.sidebarWidth = meta.sidebar_width;
     if (meta.duration_unit === 'days' || meta.duration_unit === 'weeks') this.durationUnit = meta.duration_unit;
     if (meta.holidays_block_work_default !== null) this.holidaysBlockWorkDefault = meta.holidays_block_work_default;
+    if (meta.include_weekends !== null) this.includeWeekends = meta.include_weekends;
+    if (meta.ui_scale !== null && meta.ui_scale > 0) {
+      this.uiScale = meta.ui_scale;
+      document.documentElement.style.setProperty('--ui-scale', String(meta.ui_scale));
+    }
     await this.refreshSidebar();
     await this.refreshArchived();
     if (meta.last_open_job_id) {

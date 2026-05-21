@@ -4,6 +4,7 @@
   import NewJobModal from './NewJobModal.svelte';
   import ArchivedGroup from './ArchivedGroup.svelte';
   import TemplatesGroup from './TemplatesGroup.svelte';
+  import BottomToolbar from '../components/BottomToolbar.svelte';
 </script>
 
 <div class="sidebar">
@@ -20,6 +21,7 @@
   <ArchivedGroup />
   <footer>
     <button class="new-job" onclick={() => store.showNewJobModal = true}>+ New job</button>
+    <BottomToolbar />
   </footer>
 </div>
 

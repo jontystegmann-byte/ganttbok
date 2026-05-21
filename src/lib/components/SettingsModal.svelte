@@ -35,7 +35,50 @@
       </div>
     </section>
 
+    <section>
+      <h3>Weekends</h3>
+      <label class="toggle">
+        <input
+          type="checkbox"
+          checked={store.includeWeekends}
+          onchange={(e) => store.setIncludeWeekends((e.currentTarget as HTMLInputElement).checked)}
+        />
+        <span>Show Saturday + Sunday columns</span>
+      </label>
+      <p class="hint">For projects where you work on weekends.</p>
+    </section>
+
+    <section>
+      <h3>Zoom — {Math.round(store.uiScale * 100)}%</h3>
+      <input
+        type="range"
+        min="0.75" max="1.5" step="0.05"
+        value={store.uiScale}
+        oninput={(e) => store.setUiScale(parseFloat((e.currentTarget as HTMLInputElement).value))}
+        class="slider"
+      />
+      <div class="slider-labels"><span>75%</span><span>100%</span><span>150%</span></div>
+    </section>
+
     {#if store.currentJob}
+      <section>
+        <h3>Job name</h3>
+        <input
+          type="text"
+          class="job-name-input"
+          value={store.currentJob.name}
+          onblur={(e) => store.renameCurrentJob((e.currentTarget as HTMLInputElement).value)}
+          onkeydown={(e) => { if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur(); }}
+        />
+        <h3 style="margin-top: var(--sp-4)">Project start date</h3>
+        <input
+          type="date"
+          class="job-name-input"
+          value={store.currentJob.project_start_date}
+          onchange={(e) => store.setCurrentJobStartDate((e.currentTarget as HTMLInputElement).value)}
+        />
+      </section>
+
       <section>
         <h3>Public holidays — this job</h3>
         <label class="toggle">
@@ -107,4 +150,7 @@
   .toggle { display: flex; align-items: center; gap: var(--sp-2); cursor: pointer; font-size: var(--font-size-sm); }
   .toggle input { width: 16px; height: 16px; cursor: pointer; }
   .hint { color: var(--c-text-muted); font-size: var(--font-size-xs); margin: var(--sp-2) 0 0; line-height: 1.4; }
+  .slider { width: 100%; }
+  .slider-labels { display: flex; justify-content: space-between; font-size: var(--font-size-xs); color: var(--c-text-muted); margin-top: var(--sp-1); }
+  .job-name-input { width: 100%; padding: var(--sp-2); border: 1px solid var(--c-border); border-radius: 4px; font-size: var(--font-size-sm); }
 </style>

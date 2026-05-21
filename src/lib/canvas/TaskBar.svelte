@@ -12,7 +12,7 @@
   const skipNoWork = $derived(store.currentJob?.holidays_block_work ?? true);
   const noWorkSet = $derived.by(() => new Set(store.noWorkDays.map((n) => n.date)));
 
-  const occupied = $derived(occupiedWorkdays(task.start_date, task.duration_workdays, noWorkSet, skipNoWork));
+  const occupied = $derived(occupiedWorkdays(task.start_date, task.duration_workdays, noWorkSet, skipNoWork, store.includeWeekends));
   const dayIndexOf = $derived.by(() => {
     const m = new Map<string, number>();
     days.forEach((d, i) => m.set(d.date, i));

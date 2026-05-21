@@ -1,4 +1,9 @@
 :root {
+  /* UI zoom scaler — applied via CSS `zoom` on body. Settings slider drives this.
+     `zoom` (Safari/WebKit-supported) scales all pixel sizes AND pointer event
+     coordinates, so the canvas hit-tests stay correct. */
+  --ui-scale: 1;
+
   /* Type */
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
   --font-mono: "SF Mono", ui-monospace, Menlo, monospace;
@@ -19,8 +24,8 @@
   --sidebar-width-default: 240px;
   --details-width:         300px;
   --row-height:            32px;
-  --day-cell-width:        24px;        /* on-screen; print scales */
-  --week-gap:              0px;          /* weeks abut; bolder vertical line between them */
+  --day-cell-width:        24px;
+  --week-gap:              0px;
   --header-height:         52px;
   --left-rail-width:       240px;
 
@@ -55,6 +60,8 @@ html, body, #app {
   user-select: none;
   -webkit-font-smoothing: antialiased;
 }
+/* Zoom temporarily disabled — was causing column-highlight offset bug. */
+/* #app { zoom: var(--ui-scale); } */
 
 button, input, textarea {
   font: inherit;

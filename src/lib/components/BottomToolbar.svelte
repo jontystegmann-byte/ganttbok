@@ -1,0 +1,370 @@
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { invoke } from '@tauri-apps/api/core';
+  import { check, type Update } from '@tauri-apps/plugin-updater';
+  import { relaunch } from '@tauri-apps/plugin-process';
+  import { getVersion } from '@tauri-apps/api/app';
+  import { store } from '../store.svelte';
+  import * as ipc from '../ipc';
+
+  /* ---------- Update checker ---------- */
+  type UpdPhase = 'idle' | 'checking' | 'no-update' | 'available' | 'downloading' | 'installed' | 'error';
+  let updPhase = $state<UpdPhase>('idle');
+  let appVersion = $state('');
+  let pending = $state<Update | null>(null);
+  let downloaded = $state(0);
+  let contentLength = $state(0);
+  let updateErr = $state('');
+  let updateModalOpen = $state(false);
+
+  async function silentUpdateCheck() {
+    try {
+      const u = await check();
+      if (u) { pending = u; updPhase = 'available'; }
+      else updPhase = 'no-update';
+    } catch (e) { updPhase = 'error'; updateErr = String(e); }
+  }
+  async function manualUpdateCheck() {
+    updPhase = 'checking'; updateModalOpen = true;
+    try {
+      const u = await check();
+      if (u) { pending = u; updPhase = 'available'; }
+      else updPhase = 'no-update';
+    } catch (e) { updPhase = 'error'; updateErr = String(e); }
+  }
+  async function installAndRestart() {
+    if (!pending) return;
+    updPhase = 'downloading'; downloaded = 0; contentLength = 0;
+    try {
+      await pending.downloadAndInstall((event) => {
+        if (event.event === 'Started') contentLength = event.data.contentLength ?? 0;
+        else if (event.event === 'Progress') downloaded += event.data.chunkLength;
+      });
+      updPhase = 'installed';
+      await relaunch();
+    } catch (e) { updPhase = 'error'; updateErr = String(e); }
+  }
+  const pct = $derived(contentLength > 0 ? Math.min(100, Math.round((downloaded / contentLength) * 100)) : 0);
+
+  onMount(async () => {
+    appVersion = await getVersion();
+    setTimeout(silentUpdateCheck, 3000);
+  });
+
+  /* ---------- Settings popover ---------- */
+  let settingsOpen = $state(false);
+
+  /* ---------- Notes panel ---------- */
+  let notesOpen = $state(false);
+
+  async function saveNotes(phaseId: number, value: string) {
+    const phase = store.phases.find((p) => p.id === phaseId);
+    if (!phase || phase.notes === value) return;
+    phase.notes = value;
+    await ipc.updatePhase($state.snapshot(phase));
+    await ipc.touchLastSave();
+  }
+
+  async function printTodo() {
+    document.body.classList.add('print-todo-mode');
+    await new Promise((r) => setTimeout(r, 80));
+    try { await invoke('print_window_portrait'); }
+    catch { window.print(); }
+    setTimeout(() => document.body.classList.remove('print-todo-mode'), 1500);
+  }
+</script>
+
+<div class="bottom-toolbar">
+  <button
+    class="icon-btn version-btn"
+    class:has-update={updPhase === 'available'}
+    onclick={manualUpdateCheck}
+    title="Check for updates"
+  >
+    {#if updPhase === 'available'}
+      Update v{pending?.version} →
+    {:else}
+      v{appVersion}
+    {/if}
+  </button>
+
+  <button class="icon-btn" onclick={() => (settingsOpen = !settingsOpen)} title="Settings" aria-label="Settings">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+  </button>
+
+  <button class="icon-btn" onclick={() => (notesOpen = !notesOpen)} title="Notes" aria-label="Notes">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="9" y1="13" x2="15" y2="13"/>
+      <line x1="9" y1="17" x2="15" y2="17"/>
+    </svg>
+  </button>
+</div>
+
+<!-- ============= Update checker modal ============= -->
+{#if updateModalOpen}
+  <div class="overlay" role="dialog" aria-modal="true">
+    <div class="modal">
+      <header>
+        <h2>
+          {#if updPhase === 'checking'}Checking for updates…
+          {:else if updPhase === 'no-update'}You're up to date
+          {:else if updPhase === 'available'}Update available
+          {:else if updPhase === 'downloading'}Installing update…
+          {:else if updPhase === 'installed'}Restarting…
+          {:else if updPhase === 'error'}Update error
+          {/if}
+        </h2>
+        <button class="close" onclick={() => (updateModalOpen = false)} disabled={updPhase === 'downloading'}>×</button>
+      </header>
+      <div class="body">
+        {#if updPhase === 'checking'}<p>Looking for a newer version…</p>
+        {:else if updPhase === 'no-update'}<p>You're running the latest version (v{appVersion}).</p>
+        {:else if updPhase === 'available' && pending}
+          <p>A new version is available: <strong>v{pending.version}</strong> (current: v{appVersion}).</p>
+          {#if pending.body}<h3>Release notes</h3><pre class="notes">{pending.body}</pre>{/if}
+          <p class="hint">Your jobs and data are preserved. The app will restart after install.</p>
+        {:else if updPhase === 'downloading'}
+          <p>Downloading v{pending?.version}…</p>
+          <div class="progress"><div class="bar" style="width: {pct}%"></div></div>
+          <p class="pct">{pct}%</p>
+        {:else if updPhase === 'installed'}<p>Update installed. Restarting…</p>
+        {:else if updPhase === 'error'}<p>Something went wrong:</p><pre class="err">{updateErr}</pre>
+        {/if}
+      </div>
+      <footer>
+        {#if updPhase === 'available'}
+          <button class="primary" onclick={installAndRestart}>Install & Restart</button>
+          <button onclick={() => (updateModalOpen = false)}>Later</button>
+        {:else if updPhase !== 'downloading'}
+          <button onclick={() => (updateModalOpen = false)}>Close</button>
+        {/if}
+      </footer>
+    </div>
+  </div>
+{/if}
+
+<!-- ============= Settings popover ============= -->
+{#if settingsOpen}
+  <div class="backdrop" onclick={() => (settingsOpen = false)} role="presentation"></div>
+  <div class="popover settings-popover" role="dialog" aria-label="Settings">
+    <header>
+      <h2>Settings</h2>
+      <button class="close" onclick={() => (settingsOpen = false)} aria-label="Close">×</button>
+    </header>
+
+    {#if store.currentJob}
+      <section>
+        <h3>Job name</h3>
+        <input type="text" class="text-input"
+          value={store.currentJob.name}
+          onblur={(e) => store.renameCurrentJob((e.currentTarget as HTMLInputElement).value)}
+          onkeydown={(e) => { if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur(); }} />
+        <h3 style="margin-top: var(--sp-4)">Project start date</h3>
+        <input type="date" class="text-input"
+          value={store.currentJob.project_start_date}
+          onchange={(e) => store.setCurrentJobStartDate((e.currentTarget as HTMLInputElement).value)} />
+      </section>
+    {/if}
+
+    <section>
+      <h3>Duration display</h3>
+      <div class="seg-toggle">
+        <button class:active={store.durationUnit === 'weeks'}
+          onclick={() => { if (store.durationUnit !== 'weeks') store.toggleDurationUnit(); }}>Weeks</button>
+        <button class:active={store.durationUnit === 'days'}
+          onclick={() => { if (store.durationUnit !== 'days') store.toggleDurationUnit(); }}>Days</button>
+      </div>
+    </section>
+
+    <section>
+      <h3>Weekends</h3>
+      <label class="toggle">
+        <input type="checkbox" checked={store.includeWeekends}
+          onchange={(e) => store.setIncludeWeekends((e.currentTarget as HTMLInputElement).checked)} />
+        <span>Show Saturday + Sunday columns</span>
+      </label>
+      <p class="hint">For projects where you work on weekends.</p>
+    </section>
+
+    <!-- Zoom slider is removed pending a clean re-implementation (CSS `zoom` was
+         breaking pointer-coord calculations for the column-hover highlight). -->
+    <!--
+    <section>
+      <h3>Zoom — {Math.round(store.uiScale * 100)}%</h3>
+      <input type="range" min="0.75" max="1.5" step="0.05"
+        value={store.uiScale}
+        oninput={(e) => store.setUiScale(parseFloat((e.currentTarget as HTMLInputElement).value))} class="slider" />
+      <div class="slider-labels"><span>75%</span><span>100%</span><span>150%</span></div>
+    </section>
+    -->
+
+
+    {#if store.currentJob}
+      <section>
+        <h3>Public holidays — this job</h3>
+        <label class="toggle">
+          <input type="checkbox" checked={store.currentJob.holidays_block_work}
+            onchange={(e) => store.setJobHolidaysBlockWork((e.currentTarget as HTMLInputElement).checked)} />
+          <span>Split bars around SA public holidays</span>
+        </label>
+        <p class="hint">
+          {#if store.currentJob.holidays_block_work}Bars step around holidays — task extends one day.
+          {:else}Holidays run through bars uninterrupted.{/if}
+          New jobs default to this setting.
+        </p>
+      </section>
+    {/if}
+  </div>
+{/if}
+
+<!-- ============= Notes side panel ============= -->
+{#if notesOpen}
+  <aside class="todo-panel">
+    <header class="screen-only">
+      <h2>Notes — {store.currentJob?.name ?? ''}</h2>
+      <div class="actions">
+        <button onclick={printTodo} title="Print A4 portrait">Print</button>
+        <button onclick={() => (notesOpen = false)} class="close" aria-label="Close">×</button>
+      </div>
+    </header>
+
+    <div class="print-only print-header-todo">
+      <h1>{store.currentJob?.name ?? 'Notes'}</h1>
+      <p class="meta">
+        {#if store.currentJob?.client}Client: {store.currentJob.client} · {/if}
+        Printed: {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+      </p>
+    </div>
+
+    <div class="content">
+      {#each store.phases as phase (phase.id)}
+        <section class="phase-block">
+          <h3 style="border-left-color: {phase.colour}; color: {phase.colour}">
+            <span class="swatch" style="background: {phase.colour}"></span>
+            {phase.name}
+          </h3>
+          <textarea class="screen-only" placeholder="• Notes for {phase.name}…"
+            value={phase.notes}
+            onblur={(e) => saveNotes(phase.id, (e.currentTarget as HTMLTextAreaElement).value)}></textarea>
+          <pre class="print-only">{phase.notes || ''}</pre>
+        </section>
+      {/each}
+    </div>
+  </aside>
+{/if}
+
+<style>
+  .bottom-toolbar {
+    display: flex; align-items: center; gap: var(--sp-1);
+    padding: var(--sp-1) 0 0;
+    border-top: 1px dashed var(--c-border);
+    margin-top: var(--sp-2);
+  }
+  .icon-btn {
+    background: transparent; border: none;
+    padding: var(--sp-1) var(--sp-2);
+    cursor: pointer; border-radius: 4px;
+    color: var(--c-text-muted);
+    font-size: var(--font-size-xs);
+    display: flex; align-items: center;
+    font-family: var(--font-mono);
+  }
+  .icon-btn:hover { background: var(--c-accent-fade); color: var(--c-accent); }
+  .version-btn { flex: 1; justify-content: flex-start; }
+  .version-btn.has-update {
+    color: var(--c-accent); background: var(--c-accent-fade);
+    font-weight: 600; font-family: inherit;
+  }
+
+  /* ============ Update modal ============ */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; display: flex; align-items: center; justify-content: center; }
+  .modal { background: var(--c-panel); border: 1px solid var(--c-border); border-radius: 8px; width: min(520px, 90vw); max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+  .modal header { display: flex; justify-content: space-between; align-items: center; padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--c-border); }
+  .modal header h2 { margin: 0; font-size: var(--font-size-base); }
+  .close { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--c-text-muted); line-height: 1; padding: 0 var(--sp-2); }
+  .close:disabled { opacity: 0.3; cursor: not-allowed; }
+  .body { padding: var(--sp-4); overflow-y: auto; }
+  .body p { margin: 0 0 var(--sp-3); }
+  .body h3 { font-size: var(--font-size-sm); margin: var(--sp-3) 0 var(--sp-2); }
+  .notes, .err { background: var(--c-bg); border: 1px solid var(--c-border); border-radius: 4px; padding: var(--sp-2) var(--sp-3); font-size: var(--font-size-xs); white-space: pre-wrap; max-height: 200px; overflow-y: auto; }
+  .err { color: #DC2626; }
+  .hint { font-size: var(--font-size-xs); color: var(--c-text-muted); }
+  .progress { height: 8px; background: var(--c-bg); border-radius: 4px; overflow: hidden; border: 1px solid var(--c-border); }
+  .bar { height: 100%; background: var(--c-accent); transition: width 0.2s; }
+  .pct { text-align: center; font-family: var(--font-mono); font-size: var(--font-size-xs); margin-top: var(--sp-2); }
+  .modal footer { display: flex; gap: var(--sp-2); justify-content: flex-end; padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--c-border); }
+  .modal footer button { padding: var(--sp-2) var(--sp-3); border: 1px solid var(--c-border); background: var(--c-panel); border-radius: 4px; cursor: pointer; font-size: var(--font-size-sm); }
+  .modal footer button.primary { background: var(--c-accent); color: white; border-color: var(--c-accent); }
+  .modal footer button:hover { background: var(--c-accent-fade); }
+
+  /* ============ Settings popover ============ */
+  .backdrop { position: fixed; inset: 0; background: transparent; z-index: 50; }
+  .settings-popover {
+    position: fixed; bottom: 60px; left: 16px; z-index: 51;
+    background: var(--c-panel); border: 1px solid var(--c-border); border-radius: 8px;
+    min-width: 320px; max-width: 380px;
+    box-shadow: 0 12px 36px rgba(0,0,0,0.18);
+    display: flex; flex-direction: column;
+    max-height: 75vh; overflow-y: auto;
+  }
+  .settings-popover header { display: flex; justify-content: space-between; align-items: center; padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--c-border); }
+  .settings-popover header h2 { margin: 0; font-size: var(--font-size-base); }
+  .settings-popover section { padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--c-border); }
+  .settings-popover section:last-child { border-bottom: none; }
+  .settings-popover section h3 { margin: 0 0 var(--sp-2); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.05em; color: var(--c-text-muted); }
+  .seg-toggle { display: flex; border: 1px solid var(--c-border); border-radius: 6px; overflow: hidden; width: max-content; }
+  .seg-toggle button { background: var(--c-panel); border: none; padding: var(--sp-2) var(--sp-3); cursor: pointer; font-size: var(--font-size-sm); color: var(--c-text-muted); }
+  .seg-toggle button.active { background: var(--c-accent); color: white; }
+  .seg-toggle button:not(.active):hover { background: var(--c-accent-fade); color: var(--c-accent); }
+  .toggle { display: flex; align-items: center; gap: var(--sp-2); cursor: pointer; font-size: var(--font-size-sm); }
+  .toggle input { width: 16px; height: 16px; cursor: pointer; }
+  .slider { width: 100%; }
+  .slider-labels { display: flex; justify-content: space-between; font-size: var(--font-size-xs); color: var(--c-text-muted); margin-top: var(--sp-1); }
+  .text-input { width: 100%; padding: var(--sp-2); border: 1px solid var(--c-border); border-radius: 4px; font-size: var(--font-size-sm); }
+
+  /* ============ Notes panel ============ */
+  .todo-panel {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: 360px;
+    background: var(--c-panel); border-left: 1px solid var(--c-border);
+    z-index: 40;
+    display: flex; flex-direction: column;
+    box-shadow: -6px 0 18px rgba(0,0,0,0.06);
+  }
+  .todo-panel header { display: flex; justify-content: space-between; align-items: center; padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--c-border); }
+  .todo-panel header h2 { margin: 0; font-size: var(--font-size-base); }
+  .actions { display: flex; gap: var(--sp-2); align-items: center; }
+  .actions button { background: var(--c-bg); border: 1px solid var(--c-border); padding: var(--sp-1) var(--sp-3); border-radius: 4px; cursor: pointer; font-size: var(--font-size-sm); }
+  .todo-panel .close { background: transparent !important; border: none !important; font-size: 22px; line-height: 1; padding: 0 var(--sp-1) !important; color: var(--c-text-muted); }
+  .content { overflow-y: auto; padding: var(--sp-3) var(--sp-4); flex: 1; }
+  .phase-block { margin-bottom: var(--sp-6); page-break-inside: avoid; }
+  .phase-block h3 {
+    display: flex; align-items: center; gap: var(--sp-2);
+    margin: 0 0 var(--sp-2);
+    padding: var(--sp-1) var(--sp-2);
+    border-left: 4px solid var(--c-accent);
+    font-size: var(--font-size-base);
+    font-weight: 700;
+  }
+  .swatch { width: 12px; height: 12px; border-radius: 2px; display: inline-block; }
+  textarea { width: 100%; min-height: 100px; padding: var(--sp-2); border: 1px solid var(--c-border); border-radius: 4px; font-family: inherit; font-size: var(--font-size-sm); resize: vertical; background: var(--c-bg); }
+  textarea:focus { outline: 2px solid var(--c-accent-fade); border-color: var(--c-accent); }
+  .print-only { display: none; }
+  .print-header-todo h1 { margin: 0 0 4mm; font-size: 18pt; }
+  .print-header-todo .meta { margin: 0 0 6mm; font-size: 10pt; color: #555; }
+
+  @media print {
+    body.print-todo-mode .screen-only { display: none !important; }
+    body.print-todo-mode .print-only { display: block !important; }
+    body.print-todo-mode .todo-panel { position: static; width: 100%; height: auto; border: none; box-shadow: none; padding: 0; }
+    body.print-todo-mode .content { overflow: visible; padding: 0; }
+    body.print-todo-mode .phase-block h3 { color: black !important; font-size: 14pt; }
+    body.print-todo-mode pre { font-family: inherit; font-size: 11pt; white-space: pre-wrap; line-height: 1.5; margin: 0 0 2mm 6mm; }
+    body.print-todo-mode .app-shell, body.print-todo-mode .print-header, body.print-todo-mode .print-footer { display: none !important; }
+  }
+</style>

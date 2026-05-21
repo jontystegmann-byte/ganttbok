@@ -32,6 +32,8 @@ pub struct Phase {
     pub colour: String,        // hex e.g. "#3B82F6"
     pub order_index: i64,
     pub collapsed: bool,
+    #[serde(default)]
+    pub notes: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

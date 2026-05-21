@@ -4,6 +4,7 @@
   import LeftRail from './LeftRail.svelte';
   import NoWorkColumn from './NoWorkColumn.svelte';
   import WeekGridLines from './WeekGridLines.svelte';
+  import HoverColumn from './HoverColumn.svelte';
   import TaskBar from './TaskBar.svelte';
   import PhaseBar from './PhaseBar.svelte';
   import DependencyArrow from './DependencyArrow.svelte';
@@ -18,6 +19,7 @@
     return computeViewportDays(
       store.currentJob.project_start_date,
       store.tasks,
+      store.includeWeekends,
     );
   });
 
@@ -57,9 +59,20 @@
   <LeftRail />
   <div class="grid-area" style="--total-w: {days.length * CELL}px;">
     <HeaderStrip {days} />
-    <div class="rows" style="height: {totalHeight}px;">
+    <div
+      class="rows"
+      style="height: {totalHeight}px;"
+      onpointermove={(e) => {
+        // Proportional math relative to .rows (the same container the highlight renders in).
+        const r = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+        const idx = Math.floor((e.clientX - r.left) / r.width * days.length);
+        store.hoveredDayIndex = (idx >= 0 && idx < days.length) ? idx : null;
+      }}
+      onpointerleave={() => { store.hoveredDayIndex = null; }}
+    >
       <NoWorkColumn {days} {totalHeight} />
       <WeekGridLines {days} {totalHeight} cellWidth={CELL} />
+      <HoverColumn {totalHeight} cellWidth={CELL} />
       <svg
         width={days.length * CELL}
         height={totalHeight}

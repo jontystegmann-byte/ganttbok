@@ -55,6 +55,7 @@
   }
   .cell {
     width: var(--cell-w, 24px);
+    box-sizing: border-box;
     border-right: 1px solid var(--c-border);
     display: flex; flex-direction: column;
     align-items: center; justify-content: flex-end;

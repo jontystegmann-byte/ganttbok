@@ -2,12 +2,14 @@ import type { Task } from './types';
 
 export interface ViewportDay {
   date: string;                // YYYY-MM-DD
-  weekday: 'M' | 'T' | 'W' | 'T' | 'F';
+  weekday: 'M' | 'T' | 'W' | 'T' | 'F' | 'S';
   dayOfMonth: number;
   projectWeekNumber: number;   // 1-indexed from the Monday of the project's start week
+  isWeekend: boolean;
 }
 
 const WEEKDAY_LETTERS = ['M', 'T', 'W', 'T', 'F'] as const;
+const ALL_DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
 
 function parse(iso: string): Date {
   // Parse as UTC to avoid timezone drift on the date math.
@@ -26,9 +28,15 @@ function mondayOfWeek(d: Date): Date {
   return new Date(d.getTime() + offset * 86400000);
 }
 
-function isWorkday(d: Date): boolean {
+/** Mon–Fri only. Used internally; weekend-inclusive mode bypasses this. */
+function isMonFri(d: Date): boolean {
   const day = d.getUTCDay();
   return day >= 1 && day <= 5;
+}
+
+/** Is `d` a workable day, given the includeWeekends setting? */
+function isWorkable(d: Date, includeWeekends: boolean): boolean {
+  return includeWeekends || isMonFri(d);
 }
 
 export function addCalendarDays(iso: string, n: number): string {
@@ -37,12 +45,10 @@ export function addCalendarDays(iso: string, n: number): string {
   return fmt(d);
 }
 
-export function addWorkdays(iso: string, n: number): string {
-  let d = parse(iso);
-  // Snap to a workday if we landed on a weekend. Direction follows the sign of n
-  // (positive/zero → snap forward, negative → snap backward).
+export function addWorkdays(iso: string, n: number, includeWeekends: boolean = false): string {
+  const d = parse(iso);
   const snapDir = n >= 0 ? 1 : -1;
-  while (!isWorkday(d)) {
+  while (!isWorkable(d, includeWeekends)) {
     d.setUTCDate(d.getUTCDate() + snapDir);
   }
   if (n === 0) return fmt(d);
@@ -50,31 +56,31 @@ export function addWorkdays(iso: string, n: number): string {
   let remaining = Math.abs(n);
   while (remaining > 0) {
     d.setUTCDate(d.getUTCDate() + step);
-    if (isWorkday(d)) remaining--;
+    if (isWorkable(d, includeWeekends)) remaining--;
   }
   return fmt(d);
 }
 
 /**
- * Compute the actual workdays a task occupies, optionally skipping no-work days.
- * Returns an array of ISO date strings of length `durationWorkdays`.
- * If `skipNoWork=true`, holidays/manual no-work days are stepped over (and the task extends further into the future).
+ * Compute the actual workdays a task occupies. Returns ISO dates of length durationWorkdays.
+ * Weekends are workable iff includeWeekends. SA holidays / manual no-work days are skipped
+ * iff skipNoWork.
  */
 export function occupiedWorkdays(
   startDate: string,
   durationWorkdays: number,
   noWorkSet: Set<string>,
   skipNoWork: boolean,
+  includeWeekends: boolean = false,
 ): string[] {
   const out: string[] = [];
   const d = parse(startDate);
-  // Snap forward to the next valid workday if we landed on a weekend or no-work day.
-  while (!isWorkday(d) || (skipNoWork && noWorkSet.has(fmt(d)))) {
+  while (!isWorkable(d, includeWeekends) || (skipNoWork && noWorkSet.has(fmt(d)))) {
     d.setUTCDate(d.getUTCDate() + 1);
   }
   while (out.length < durationWorkdays) {
     const iso = fmt(d);
-    if (isWorkday(d) && (!skipNoWork || !noWorkSet.has(iso))) {
+    if (isWorkable(d, includeWeekends) && (!skipNoWork || !noWorkSet.has(iso))) {
       out.push(iso);
     }
     d.setUTCDate(d.getUTCDate() + 1);
@@ -102,7 +108,11 @@ export function groupConsecutive(indices: number[]): { start: number; len: numbe
   return runs;
 }
 
-export function computeViewportDays(projectStart: string, tasks: Task[]): ViewportDay[] {
+export function computeViewportDays(
+  projectStart: string,
+  tasks: Task[],
+  includeWeekends: boolean = false,
+): ViewportDay[] {
   // Start at the earliest of (project_start, any task's start_date) so tasks dragged
   // before the project_start_date are still visible in the viewport.
   let earliestStart = parse(projectStart);
@@ -112,39 +122,38 @@ export function computeViewportDays(projectStart: string, tasks: Task[]): Viewpo
   }
   const start = mondayOfWeek(earliestStart);
 
-  // Compute the latest end so the viewport is wide enough.
   let latestEnd = parse(projectStart);
   for (const t of tasks) {
-    const end = parse(addWorkdays(t.start_date, Math.max(0, t.duration_workdays - 1)));
+    const end = parse(addWorkdays(t.start_date, Math.max(0, t.duration_workdays - 1), includeWeekends));
     if (end > latestEnd) latestEnd = end;
   }
-  // Pad 4 weeks beyond the latest task end (28 days).
+  // Pad ~4 weeks beyond the latest task end.
   latestEnd.setUTCDate(latestEnd.getUTCDate() + 28);
-  // Round latestEnd forward to the Friday of its week so viewport contains whole weeks.
-  // getUTCDay: Mon=1..Fri=5..Sun=0
+  // Round latestEnd forward to Sunday so viewport contains whole weeks.
   const dow = latestEnd.getUTCDay();
-  if (dow === 0) {
-    latestEnd.setUTCDate(latestEnd.getUTCDate() - 2); // Sun -> previous Fri
-  } else if (dow === 6) {
-    latestEnd.setUTCDate(latestEnd.getUTCDate() - 1); // Sat -> previous Fri
-  } else if (dow < 5) {
-    latestEnd.setUTCDate(latestEnd.getUTCDate() + (5 - dow)); // forward to Friday
+  if (dow !== 0) {
+    latestEnd.setUTCDate(latestEnd.getUTCDate() + (7 - dow));
   }
 
   const days: ViewportDay[] = [];
-  let cur = new Date(start);
+  const cur = new Date(start);
   let weekNum = 1;
   let weekdayIdx = 0;
   while (cur <= latestEnd) {
-    if (isWorkday(cur)) {
+    const isWknd = cur.getUTCDay() === 0 || cur.getUTCDay() === 6;
+    const include = includeWeekends || !isWknd;
+    if (include) {
+      const letters = includeWeekends ? ALL_DAY_LETTERS : WEEKDAY_LETTERS;
       days.push({
         date: fmt(cur),
-        weekday: WEEKDAY_LETTERS[weekdayIdx],
+        weekday: letters[weekdayIdx] as ViewportDay['weekday'],
         dayOfMonth: cur.getUTCDate(),
         projectWeekNumber: weekNum,
+        isWeekend: isWknd,
       });
       weekdayIdx++;
-      if (weekdayIdx === 5) {
+      const wkLen = includeWeekends ? 7 : 5;
+      if (weekdayIdx === wkLen) {
         weekdayIdx = 0;
         weekNum++;
       }

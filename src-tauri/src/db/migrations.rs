@@ -63,6 +63,8 @@ const MIGRATIONS: &[&str] = &[
     "#,
     // v2 — per-job holiday-split toggle. 1 = SA holidays split bars (current default).
     "ALTER TABLE job ADD COLUMN holidays_block_work INTEGER NOT NULL DEFAULT 1;",
+    // v3 — per-phase free-text notes (drives the todo-list side panel).
+    "ALTER TABLE phase ADD COLUMN notes TEXT NOT NULL DEFAULT '';",
 ];
 
 pub fn apply_migrations(conn: &Connection) -> GbResult<()> {

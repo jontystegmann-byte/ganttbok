@@ -12,6 +12,8 @@ pub struct StartupInfo {
     pub sidebar_width: Option<i64>,
     pub duration_unit: Option<String>,
     pub holidays_block_work_default: Option<bool>,
+    pub include_weekends: Option<bool>,
+    pub ui_scale: Option<f64>,
 }
 
 /// Called by the frontend on app launch. Returns the previous shutdown state then marks the
@@ -26,6 +28,8 @@ pub fn startup_info(db: State<Db>) -> GbResult<StartupInfo> {
     let duration_unit = meta_get(&conn, "duration_unit")?;
     let holidays_block_work_default = meta_get(&conn, "holidays_block_work_default")?
         .map(|s| s == "1");
+    let include_weekends = meta_get(&conn, "include_weekends")?.map(|s| s == "1");
+    let ui_scale = meta_get(&conn, "ui_scale")?.and_then(|s| s.parse::<f64>().ok());
     meta_set(&conn, "clean_shutdown", "0")?;
     Ok(StartupInfo {
         clean_shutdown: clean,
@@ -34,6 +38,8 @@ pub fn startup_info(db: State<Db>) -> GbResult<StartupInfo> {
         sidebar_width,
         duration_unit,
         holidays_block_work_default,
+        include_weekends,
+        ui_scale,
     })
 }
 
@@ -68,14 +74,57 @@ pub fn set_holidays_block_work_default(db: State<Db>, value: bool) -> GbResult<(
 }
 
 #[tauri::command]
+pub fn set_include_weekends(db: State<Db>, value: bool) -> GbResult<()> {
+    let conn = db.0.lock().unwrap();
+    meta_set(&conn, "include_weekends", if value { "1" } else { "0" })
+}
+
+#[tauri::command]
+pub fn set_ui_scale(db: State<Db>, value: f64) -> GbResult<()> {
+    let conn = db.0.lock().unwrap();
+    meta_set(&conn, "ui_scale", &value.to_string())
+}
+
+#[tauri::command]
 pub fn touch_last_save(db: State<Db>) -> GbResult<()> {
     let conn = db.0.lock().unwrap();
     meta_set(&conn, "last_save_at", &chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string())
 }
 
 /// Trigger the macOS native print panel via WebKit. JS `window.print()` is unreliable in WKWebView.
+/// Also coerces the shared NSPrintInfo to A3 landscape so the Gantt prints sensibly by default.
 #[tauri::command]
 pub fn print_window(window: tauri::WebviewWindow) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        use objc2_app_kit::{NSPrintInfo, NSPaperOrientation};
+        use objc2_foundation::{NSSize, NSString, ns_string};
+        {
+            let info = NSPrintInfo::sharedPrintInfo();
+            info.setOrientation(NSPaperOrientation::Landscape);
+            info.setPaperSize(NSSize::new(1190.55, 841.89)); // A3 landscape (points)
+            let a3: &NSString = ns_string!("iso-a3");
+            info.setPaperName(Some(a3));
+        }
+    }
+    window.print().map_err(|e| e.to_string())
+}
+
+/// Same as print_window but pre-configures A4 portrait — used for the todo-list print path.
+#[tauri::command]
+pub fn print_window_portrait(window: tauri::WebviewWindow) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        use objc2_app_kit::{NSPrintInfo, NSPaperOrientation};
+        use objc2_foundation::{NSSize, NSString, ns_string};
+        {
+            let info = NSPrintInfo::sharedPrintInfo();
+            info.setOrientation(NSPaperOrientation::Portrait);
+            info.setPaperSize(NSSize::new(595.28, 841.89)); // A4 portrait (points)
+            let a4: &NSString = ns_string!("iso-a4");
+            info.setPaperName(Some(a4));
+        }
+    }
     window.print().map_err(|e| e.to_string())
 }
 

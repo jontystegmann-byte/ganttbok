@@ -4,16 +4,18 @@ use crate::{GbError, GbResult};
 
 pub fn create(conn: &Connection, new: &NewPhase) -> GbResult<Phase> {
     conn.execute(
-        "INSERT INTO phase (job_id, name, colour, order_index, collapsed)
-         VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT INTO phase (job_id, name, colour, order_index, collapsed, notes)
+         VALUES (?1, ?2, ?3, ?4, ?5, '')",
         params![new.job_id, new.name, new.colour, new.order_index, new.collapsed as i64],
     )?;
     get(conn, conn.last_insert_rowid())
 }
 
+const SELECT_COLS: &str = "id, job_id, name, colour, order_index, collapsed, notes";
+
 pub fn get(conn: &Connection, id: i64) -> GbResult<Phase> {
     conn.query_row(
-        "SELECT id, job_id, name, colour, order_index, collapsed FROM phase WHERE id = ?1",
+        &format!("SELECT {SELECT_COLS} FROM phase WHERE id = ?1"),
         [id],
         row_to_phase,
     )
@@ -25,8 +27,7 @@ pub fn get(conn: &Connection, id: i64) -> GbResult<Phase> {
 
 pub fn list_for_job(conn: &Connection, job_id: i64) -> GbResult<Vec<Phase>> {
     let mut stmt = conn.prepare(
-        "SELECT id, job_id, name, colour, order_index, collapsed
-         FROM phase WHERE job_id = ?1 ORDER BY order_index ASC",
+        &format!("SELECT {SELECT_COLS} FROM phase WHERE job_id = ?1 ORDER BY order_index ASC"),
     )?;
     let rows = stmt.query_map([job_id], row_to_phase)?;
     let mut out = Vec::new();
@@ -36,8 +37,8 @@ pub fn list_for_job(conn: &Connection, job_id: i64) -> GbResult<Vec<Phase>> {
 
 pub fn update(conn: &Connection, phase: &Phase) -> GbResult<()> {
     let n = conn.execute(
-        "UPDATE phase SET name = ?1, colour = ?2, order_index = ?3, collapsed = ?4 WHERE id = ?5",
-        params![phase.name, phase.colour, phase.order_index, phase.collapsed as i64, phase.id],
+        "UPDATE phase SET name = ?1, colour = ?2, order_index = ?3, collapsed = ?4, notes = ?5 WHERE id = ?6",
+        params![phase.name, phase.colour, phase.order_index, phase.collapsed as i64, phase.notes, phase.id],
     )?;
     if n == 0 { return Err(GbError::NotFound(format!("phase {}", phase.id))); }
     Ok(())
@@ -72,6 +73,7 @@ fn row_to_phase(r: &rusqlite::Row) -> rusqlite::Result<Phase> {
         colour: r.get(3)?,
         order_index: r.get(4)?,
         collapsed: r.get::<_, i64>(5)? != 0,
+        notes: r.get(6)?,
     })
 }
 

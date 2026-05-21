@@ -7,8 +7,6 @@
   import SavedIndicator from './lib/footer/SavedIndicator.svelte';
   import PrintOptions from './lib/print/PrintOptions.svelte';
   import Toast from './lib/components/Toast.svelte';
-  import UpdateChecker from './lib/components/UpdateChecker.svelte';
-  import SettingsModal from './lib/components/SettingsModal.svelte';
 
   onMount(async () => {
     await store.bootstrap();
@@ -75,8 +73,6 @@
 </div>
 
 <SavedIndicator />
-<UpdateChecker />
-<SettingsModal />
 <Toast />
 
 {#if store.showPrintOptions}

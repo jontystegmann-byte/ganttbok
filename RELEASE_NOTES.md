@@ -1,10 +1,15 @@
-Gantt Bok v1.1.1 — drag, dependency, holiday & settings fixes
+Gantt Bok v1.2.0 — print fix, weekend toggle, todo notes, polish
 
-FIXED
-- Right-edge resize now actually grows the bar to the right. Previously the right handle was rerouting to the left edge and shifting the start instead.
-- The dependency-creation circle no longer disappears when your mouse crosses the gap from the bar end to the port. Hover zone now bridges across.
-- Bars physically split around public holidays now. When the holiday toggle is on, the bar breaks visually at each public holiday and the task automatically extends one extra day to compensate.
-- Phase bars are more robust to tasks whose start dates fall before the project's stated start (the viewport now expands leftward so they're visible).
+NEW
+- Print landscape — A3 landscape now applied automatically by the app before the system print dialog opens. No more portrait surprise.
+- Weekend toggle in Settings — flip on to show Saturday + Sunday columns for projects where you work on weekends.
+- Column hover highlight — the day column under your cursor gets a faint blue tint, making it easy to see exactly which day you're hovering.
+- Inline edit job name and project start date — both live in the new Settings popover, save on blur.
+- Notes panel — a per-job side drawer (notepad icon, bottom-left). Each phase gets its own colour-coded heading and a free-text bullet area. Has its own A4 portrait Print button — separate from the Gantt landscape print.
+- Phase drag-to-reorder now actually works — drag a phase row in the left rail to a new position; order persists.
 
 CHANGED
-- Job-level settings (public-holiday split toggle) moved out of the right-hand panel and into a small ⚙ gear icon at the bottom-left. The right-hand panel now goes back to showing only when you select a task or phase. Duration unit (weeks/days) also lives in the new settings popover.
+- Bottom-left controls reorganised. Settings, Notes, and the version/update badge now live in the sidebar footer above the New job button — no more overlap.
+
+KNOWN
+- Universal zoom slider deferred to a later release; the CSS `zoom` approach we tried interfered with the new column-hover positioning. Will reappear in a clean form.

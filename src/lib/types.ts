@@ -21,6 +21,7 @@ export interface Phase {
   colour: string;
   order_index: number;
   collapsed: boolean;
+  notes: string;
 }
 
 export interface Task {
@@ -56,6 +57,8 @@ export interface StartupInfo {
   sidebar_width: number | null;
   duration_unit: 'weeks' | 'days' | null;
   holidays_block_work_default: boolean | null;
+  include_weekends: boolean | null;
+  ui_scale: number | null;
 }
 
 export interface DragResult {
