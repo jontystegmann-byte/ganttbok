@@ -53,23 +53,26 @@ build_target aarch64-apple-darwin
 assets_dir="$(mktemp -d)"
 echo "==> Collecting artifacts into $assets_dir"
 
+# collect() takes triple + a human-friendly slug used in the output filenames.
+# The Tauri updater's platform keys (darwin-x86_64 / darwin-aarch64) are hard-coded
+# in latest.json below — those must stay exact.
 collect() {
   local TRIPLE="$1"
-  local PLATFORM_KEY="$2"
+  local SLUG="$2"
   local BUNDLE_DIR="src-tauri/target/$TRIPLE/release/bundle"
   local TAR_SRC=$(ls "$BUNDLE_DIR/macos/"*.app.tar.gz | head -1)
   local SIG_SRC="${TAR_SRC}.sig"
   local DMG_SRC=$(ls "$BUNDLE_DIR/dmg/"*.dmg | head -1)
-  local DMG_OUT="$assets_dir/Gantt_Bok_${VERSION}_${PLATFORM_KEY}.dmg"
-  local TAR_OUT="$assets_dir/Gantt_Bok_${VERSION}_${PLATFORM_KEY}.app.tar.gz"
+  local DMG_OUT="$assets_dir/Gantt_Bok_${VERSION}_${SLUG}.dmg"
+  local TAR_OUT="$assets_dir/Gantt_Bok_${VERSION}_${SLUG}.app.tar.gz"
   cp "$DMG_SRC" "$DMG_OUT"
   cp "$TAR_SRC" "$TAR_OUT"
   cp "$SIG_SRC" "$TAR_OUT.sig"
   echo "$TAR_OUT"
 }
 
-TAR_X86="$(collect x86_64-apple-darwin   darwin-x86_64)"
-TAR_ARM="$(collect aarch64-apple-darwin  darwin-aarch64)"
+TAR_X86="$(collect x86_64-apple-darwin   Intel)"
+TAR_ARM="$(collect aarch64-apple-darwin  Apple-Silicon)"
 
 LATEST_JSON="$assets_dir/latest.json"
 export GB_VERSION="$VERSION"

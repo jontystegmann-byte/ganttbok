@@ -17,10 +17,10 @@ Always grab the latest version from the [**Releases page**](https://github.com/j
 
 | Your Mac | File to download |
 |----------|------------------|
-| **Apple Silicon** — M1, M2, M3, M4 (most Macs sold since late 2020) | `Gantt_Bok_X.Y.Z_darwin-aarch64.dmg` |
-| **Intel** — Macs with "Intel Core" listed under Chip | `Gantt_Bok_X.Y.Z_darwin-x86_64.dmg` |
+| **Apple Silicon** — M1, M2, M3, M4 (most Macs sold since late 2020) | `Gantt_Bok_X.Y.Z_Apple-Silicon.dmg` |
+| **Intel** — Macs with "Intel Core" listed under Chip | `Gantt_Bok_X.Y.Z_Intel.dmg` |
 
-Not sure? Try the **aarch64** one first — Apple Silicon Macs run only that natively. If it says "wrong architecture" when opening, you're on Intel; grab the x86_64.
+Not sure? Try the **Apple-Silicon** one first. If macOS says "wrong architecture" when opening it, you're on Intel — grab the Intel DMG instead.
 
 ### Install
 
