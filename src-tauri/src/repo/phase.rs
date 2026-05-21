@@ -91,6 +91,7 @@ mod tests {
             project_start_date: NaiveDate::from_ymd_opt(2026, 6, 5).unwrap(),
             is_template: false,
             holidays_block_work: true,
+            region: "ZA".into(),
         }).unwrap();
         j.id
     }

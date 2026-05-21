@@ -12,6 +12,7 @@ export interface Job {
   archived: boolean;
   created_at: string;
   holidays_block_work: boolean;
+  region: string;
 }
 
 export interface Phase {
@@ -59,6 +60,7 @@ export interface StartupInfo {
   holidays_block_work_default: boolean | null;
   include_weekends: boolean | null;
   ui_scale: number | null;
+  region_default: string | null;
 }
 
 export interface DragResult {
@@ -73,6 +75,7 @@ export interface CreateJobArgs {
   project_start_date: string;
   is_template: boolean;
   holidays_block_work: boolean;
+  region: string;
 }
 
 export interface CreatePhaseArgs {

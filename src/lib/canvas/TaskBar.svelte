@@ -13,6 +13,8 @@
   const noWorkSet = $derived.by(() => new Set(store.noWorkDays.map((n) => n.date)));
 
   const occupied = $derived(occupiedWorkdays(task.start_date, task.duration_workdays, noWorkSet, skipNoWork, store.includeWeekends));
+  /** Task is "past" once its very last occupied day is strictly before today. */
+  const isPast = $derived(occupied.length > 0 && occupied[occupied.length - 1] < store.todayIso);
   const dayIndexOf = $derived.by(() => {
     const m = new Map<string, number>();
     days.forEach((d, i) => m.set(d.date, i));
@@ -115,10 +117,11 @@
         width={seg.len * 24} height={20}
         rx={3}
         fill={phase.colour}
-        fill-opacity={1}
+        fill-opacity={isPast ? 0.25 : 1}
         stroke={isSelected && si === 0 ? 'var(--c-accent)' : 'transparent'}
         stroke-width="2"
         class="bar-body zone-move"
+        class:past={isPast}
         onpointerdown={onBodyDown}
       />
     {/each}
@@ -153,7 +156,11 @@
   />
 
   {#if livePreview.w > 60}
-    <text x={livePreview.x + 6} y={y + 14} fill="white" font-size="11" pointer-events="none">{task.name}</text>
+    <text
+      x={livePreview.x + 6} y={y + 14}
+      fill={isPast ? 'rgba(0,0,0,0.4)' : 'white'}
+      font-size="11" pointer-events="none"
+    >{task.name}</text>
   {/if}
 
   <!-- Dep creation port: clearly separated, outside the right edge -->

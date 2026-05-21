@@ -51,6 +51,8 @@ class Store {
   includeWeekends = $state<boolean>(false);
   uiScale = $state<number>(1);
   hoveredDayIndex = $state<number | null>(null);
+  todayIso = $state<string>(new Date().toISOString().slice(0, 10));
+  regionDefault = $state<string>('ZA');
 
   async toggleDurationUnit(): Promise<void> {
     this.durationUnit = this.durationUnit === 'weeks' ? 'days' : 'weeks';
@@ -66,6 +68,28 @@ class Store {
     this.uiScale = value;
     document.documentElement.style.setProperty('--ui-scale', String(value));
     await ipc.setUiScale(value);
+  }
+
+  async setCurrentJobRegion(region: string): Promise<void> {
+    if (!this.currentJob) return;
+    if (region === this.currentJob.region) return;
+    this.currentJob.region = region;
+    await ipc.updateJob($state.snapshot(this.currentJob));
+    // Re-sync holidays for the new region across the project window.
+    const from = this.currentJob.project_start_date;
+    const startDate = new Date(from);
+    const end = new Date(startDate);
+    end.setMonth(end.getMonth() + 18);
+    await ipc.syncHolidays({
+      job_id: this.currentJob.id,
+      region,
+      from,
+      to: end.toISOString().slice(0, 10),
+    });
+    this.noWorkDays = await ipc.listNoWorkDays(this.currentJob.id);
+    // Save as new default for future jobs.
+    this.regionDefault = region;
+    await ipc.setRegionDefault(region);
   }
 
   // Dep creation gesture
@@ -147,7 +171,12 @@ class Store {
   }
 
   async createJob(args: { name: string; client: string | null; address: string | null; project_start_date: string; }): Promise<void> {
-    const job = await ipc.createJob({ ...args, is_template: false, holidays_block_work: this.holidaysBlockWorkDefault });
+    const job = await ipc.createJob({
+      ...args,
+      is_template: false,
+      holidays_block_work: this.holidaysBlockWorkDefault,
+      region: this.regionDefault,
+    });
     await this.refreshSidebar();
     await this.openJob(job.id);
     await ipc.touchLastSave();
@@ -201,6 +230,25 @@ class Store {
     return m;
   });
 
+  /** Refresh todayIso to the actual current date. Called on bootstrap, focus, and a minute timer. */
+  tickToday(): void {
+    const iso = new Date().toISOString().slice(0, 10);
+    if (iso !== this.todayIso) this.todayIso = iso;
+  }
+
+  /** Scroll the canvas .grid-area so today's column sits ~1 week from the left visible edge. */
+  scrollToToday(): void {
+    requestAnimationFrame(() => {
+      const grid = document.querySelector('.grid-area') as HTMLElement | null;
+      if (!grid) return;
+      const todayCol = document.querySelector(`.rows`)?.querySelector('.today-line') as HTMLElement | null;
+      if (!todayCol) return;
+      const x = parseFloat(todayCol.style.left) || 0;
+      const CELL = 24;
+      grid.scrollLeft = Math.max(0, x - CELL * 5);
+    });
+  }
+
   // Bootstrap: load app meta + jobs at startup.
   async bootstrap(): Promise<void> {
     const meta = await ipc.startupInfo();
@@ -208,6 +256,7 @@ class Store {
     if (meta.duration_unit === 'days' || meta.duration_unit === 'weeks') this.durationUnit = meta.duration_unit;
     if (meta.holidays_block_work_default !== null) this.holidaysBlockWorkDefault = meta.holidays_block_work_default;
     if (meta.include_weekends !== null) this.includeWeekends = meta.include_weekends;
+    if (meta.region_default) this.regionDefault = meta.region_default;
     if (meta.ui_scale !== null && meta.ui_scale > 0) {
       this.uiScale = meta.ui_scale;
       document.documentElement.style.setProperty('--ui-scale', String(meta.ui_scale));
@@ -218,6 +267,10 @@ class Store {
       try { await this.openJob(meta.last_open_job_id); }
       catch { /* job may have been deleted */ }
     }
+
+    // Keep today's date fresh: tick every minute, plus on window focus.
+    setInterval(() => this.tickToday(), 60_000);
+    window.addEventListener('focus', () => this.tickToday());
   }
 
   async refreshSidebar(): Promise<void> {
@@ -232,8 +285,9 @@ class Store {
       const startDate = new Date(start);
       const end = new Date(startDate);
       end.setMonth(end.getMonth() + 18);
-      await ipc.syncSaHolidays({
+      await ipc.syncHolidays({
         job_id: jobId,
+        region: this.currentJob.region || 'ZA',
         from: start,
         to: end.toISOString().slice(0, 10),
       });
@@ -247,6 +301,7 @@ class Store {
     this.undoStack.clear();
     this.recordHistory(); // seed
     this.hasUnsavedUndo = false;
+    this.scrollToToday();
   }
 
   select(s: Selection): void {

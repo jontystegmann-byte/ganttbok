@@ -7,6 +7,7 @@
   import SavedIndicator from './lib/footer/SavedIndicator.svelte';
   import PrintOptions from './lib/print/PrintOptions.svelte';
   import Toast from './lib/components/Toast.svelte';
+  import RenameBundlePrompt from './lib/components/RenameBundlePrompt.svelte';
 
   onMount(async () => {
     await store.bootstrap();
@@ -42,7 +43,7 @@
       <GanttCanvas />
     {:else}
       <div class="empty-state">
-        <h1>Gantt Bok</h1>
+        <h1><span style="font-weight: 900">BLIK</span> <span style="font-weight: 300; color: var(--c-text-muted)">Plan</span></h1>
         <p>Pick a job from the left, or create a new one.</p>
       </div>
     {/if}
@@ -73,6 +74,7 @@
 </div>
 
 <SavedIndicator />
+<RenameBundlePrompt />
 <Toast />
 
 {#if store.showPrintOptions}

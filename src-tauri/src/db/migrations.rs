@@ -65,6 +65,33 @@ const MIGRATIONS: &[&str] = &[
     "ALTER TABLE job ADD COLUMN holidays_block_work INTEGER NOT NULL DEFAULT 1;",
     // v3 — per-phase free-text notes (drives the todo-list side panel).
     "ALTER TABLE phase ADD COLUMN notes TEXT NOT NULL DEFAULT '';",
+    // v4 — per-job region (drives which set of public holidays to sync).
+    "ALTER TABLE job ADD COLUMN region TEXT NOT NULL DEFAULT 'ZA';",
+    // v5 — broaden no_work_day.source CHECK to include all 5 regions.
+    // SQLite can't ALTER a CHECK constraint; rename + recreate + copy.
+    r#"
+    ALTER TABLE no_work_day RENAME TO no_work_day_old;
+
+    CREATE TABLE no_work_day (
+        id      INTEGER PRIMARY KEY AUTOINCREMENT,
+        job_id  INTEGER NOT NULL REFERENCES job(id) ON DELETE CASCADE,
+        date    TEXT    NOT NULL,
+        reason  TEXT    NOT NULL,
+        source  TEXT    NOT NULL CHECK (source IN (
+            'za_holiday', 'us_holiday', 'gb_holiday', 'in_holiday', 'cn_holiday',
+            'sa_public_holiday', -- legacy alias from v1
+            'manual'
+        )),
+        UNIQUE(job_id, date)
+    );
+
+    INSERT INTO no_work_day (id, job_id, date, reason, source)
+        SELECT id, job_id, date, reason,
+            CASE WHEN source = 'sa_public_holiday' THEN 'za_holiday' ELSE source END
+        FROM no_work_day_old;
+
+    DROP TABLE no_work_day_old;
+    "#,
 ];
 
 pub fn apply_migrations(conn: &Connection) -> GbResult<()> {

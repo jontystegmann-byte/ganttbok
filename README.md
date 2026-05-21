@@ -1,8 +1,10 @@
-# Gantt Bok
+# BLIK Plan
 
-A small, fast macOS Gantt-chart app for apartment renovations. Mon–Fri workdays, SA public holidays auto-synced, week-numbered timeline, magnetic-snap drag with hard-chain dependency ripple. Prints to A3 landscape. ~5 MB DMG, fully offline, no account, no cloud.
+A small, fast macOS Gantt-chart app for builders, designers, and anyone who plans projects in weeks. Mon–Fri (or 7-day) workdays, public holidays auto-synced for **South Africa · USA · UK · India · China**, week-numbered timeline, magnetic-snap drag with hard-chain dependency ripple, per-job notes panel, today-line tracker. Prints A3 landscape (Gantt) and A4 portrait (notes). ~5 MB DMG, fully offline, no account, no cloud.
 
-> Built by [Jonty Stegmann](https://github.com/jontystegmann-byte) for friends and family in the South African construction trade. Free.
+> Built by [Jonty Stegmann](https://github.com/jontystegmann-byte). Free.
+>
+> *Previously known as Gantt Bok — same app, new name, same auto-update channel.*
 
 ---
 
@@ -17,14 +19,14 @@ Always grab the latest version from the [**Releases page**](https://github.com/j
 
 | Your Mac | File to download |
 |----------|------------------|
-| **Apple Silicon** — M1, M2, M3, M4 (most Macs sold since late 2020) | `Gantt_Bok_X.Y.Z_Apple-Silicon.dmg` |
-| **Intel** — Macs with "Intel Core" listed under Chip | `Gantt_Bok_X.Y.Z_Intel.dmg` |
+| **Apple Silicon** — M1, M2, M3, M4 (most Macs sold since late 2020) | `Blik_Plan_X.Y.Z_Apple-Silicon.dmg` |
+| **Intel** — Macs with "Intel Core" listed under Chip | `Blik_Plan_X.Y.Z_Intel.dmg` |
 
 Not sure? Try the **Apple-Silicon** one first. If macOS says "wrong architecture" when opening it, you're on Intel — grab the Intel DMG instead.
 
 ### Install
 
-1. Open the DMG. Drag **Gantt Bok** into your Applications folder.
+1. Open the DMG. Drag **Blik Plan** into your Applications folder.
 2. First launch: macOS will say "developer cannot be verified" (the app is signed but not paid-Apple-Developer signed). One-time workaround:
    - **Right-click** the app in Applications → **Open** → confirm the warning dialog.
    - From here on every launch is normal.
@@ -32,7 +34,7 @@ Not sure? Try the **Apple-Silicon** one first. If macOS says "wrong architecture
 
 ### Your data
 
-All your jobs live in a single SQLite file at `~/Library/Application Support/Gantt Bok/ganttbok.db`. It sits outside the app bundle, so it survives every reinstall and every auto-update. Time Machine backs it up automatically.
+All your jobs live in a single SQLite file at `~/Library/Application Support/Gantt Bok/ganttbok.db`. *(Path retained from the app's original name — Blik Plan and Gantt Bok share the same data directory so your jobs carried over the rebrand automatically.)* The file sits outside the app bundle, so it survives every reinstall and every auto-update. Time Machine backs it up automatically.
 
 ---
 

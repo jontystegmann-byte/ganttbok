@@ -4,9 +4,9 @@
      coordinates, so the canvas hit-tests stay correct. */
   --ui-scale: 1;
 
-  /* Type */
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
-  --font-mono: "SF Mono", ui-monospace, Menlo, monospace;
+  /* Type — Blik Plan: Inter for UI + JetBrains Mono for meta. Falls back gracefully. */
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
   --font-size-xs:   11px;
   --font-size-sm:   12px;
   --font-size-base: 13px;
@@ -29,18 +29,18 @@
   --header-height:         52px;
   --left-rail-width:       240px;
 
-  /* Colour — light theme (we hard-code light only; dark mode = Plan 3 polish) */
-  --c-bg:           #FAFAFA;
-  --c-panel:        #FFFFFF;
-  --c-border:       #E5E7EB;
-  --c-border-bold:  #CBD5E1;
-  --c-text:         #0F172A;
-  --c-text-muted:   #64748B;
-  --c-accent:       #2563EB;          /* selection + Monday text */
-  --c-accent-fade:  #DBEAFE;
-  --c-no-work:      #E5E7EB;          /* diagonal-stripe column fill */
-  --c-no-work-text: #475569;
-  --c-shadow:       rgba(15, 23, 42, 0.08);
+  /* Colour — Blik Plan light theme (from claude.ai/design brand sheet). */
+  --c-bg:           #F2F1EC;          /* paper-2 */
+  --c-panel:        #FAFAF7;          /* paper */
+  --c-border:       rgba(14, 14, 16, 0.08);
+  --c-border-bold:  rgba(14, 14, 16, 0.18);
+  --c-text:         #0E0E10;          /* ink */
+  --c-text-muted:   #6b6b68;          /* mute */
+  --c-accent:       #E11D2A;          /* Blik Red — selection + Monday text */
+  --c-accent-fade:  #FCE4E6;          /* red-light */
+  --c-no-work:      #E5E3DD;          /* warm grey diagonal-stripe */
+  --c-no-work-text: #6b6b68;
+  --c-shadow:       rgba(14, 14, 16, 0.10);
 
   /* Bars */
   --bar-radius:    3px;

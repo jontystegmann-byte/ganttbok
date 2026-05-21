@@ -63,8 +63,8 @@ collect() {
   local TAR_SRC=$(ls "$BUNDLE_DIR/macos/"*.app.tar.gz | head -1)
   local SIG_SRC="${TAR_SRC}.sig"
   local DMG_SRC=$(ls "$BUNDLE_DIR/dmg/"*.dmg | head -1)
-  local DMG_OUT="$assets_dir/Gantt_Bok_${VERSION}_${SLUG}.dmg"
-  local TAR_OUT="$assets_dir/Gantt_Bok_${VERSION}_${SLUG}.app.tar.gz"
+  local DMG_OUT="$assets_dir/Blik_Plan_${VERSION}_${SLUG}.dmg"
+  local TAR_OUT="$assets_dir/Blik_Plan_${VERSION}_${SLUG}.app.tar.gz"
   cp "$DMG_SRC" "$DMG_OUT"
   cp "$TAR_SRC" "$TAR_OUT"
   cp "$SIG_SRC" "$TAR_OUT.sig"

@@ -14,6 +14,7 @@ pub struct StartupInfo {
     pub holidays_block_work_default: Option<bool>,
     pub include_weekends: Option<bool>,
     pub ui_scale: Option<f64>,
+    pub region_default: Option<String>,
 }
 
 /// Called by the frontend on app launch. Returns the previous shutdown state then marks the
@@ -30,6 +31,7 @@ pub fn startup_info(db: State<Db>) -> GbResult<StartupInfo> {
         .map(|s| s == "1");
     let include_weekends = meta_get(&conn, "include_weekends")?.map(|s| s == "1");
     let ui_scale = meta_get(&conn, "ui_scale")?.and_then(|s| s.parse::<f64>().ok());
+    let region_default = meta_get(&conn, "region_default")?;
     meta_set(&conn, "clean_shutdown", "0")?;
     Ok(StartupInfo {
         clean_shutdown: clean,
@@ -40,6 +42,7 @@ pub fn startup_info(db: State<Db>) -> GbResult<StartupInfo> {
         holidays_block_work_default,
         include_weekends,
         ui_scale,
+        region_default,
     })
 }
 
@@ -83,6 +86,80 @@ pub fn set_include_weekends(db: State<Db>, value: bool) -> GbResult<()> {
 pub fn set_ui_scale(db: State<Db>, value: f64) -> GbResult<()> {
     let conn = db.0.lock().unwrap();
     meta_set(&conn, "ui_scale", &value.to_string())
+}
+
+#[tauri::command]
+pub fn set_region_default(db: State<Db>, region: String) -> GbResult<()> {
+    let conn = db.0.lock().unwrap();
+    meta_set(&conn, "region_default", &region)
+}
+
+/// Detect a mismatch between the on-disk `.app` folder name and the productName.
+/// Returns Some({current, desired}) when the user is running from `/Applications/Gantt Bok.app`
+/// (or any other stale-named bundle) and should be offered a rename. Returns None when
+/// the names already match, or when we can't safely determine a rename target (dev mode,
+/// non-bundle install, etc.).
+#[tauri::command]
+pub fn bundle_rename_needed() -> Option<serde_json::Value> {
+    let exe = std::env::current_exe().ok()?;
+    // Walk up: exe → MacOS → Contents → <Name>.app
+    let app_bundle = exe.parent()?.parent()?.parent()?;
+    let parent_dir = app_bundle.parent()?;
+    let current_name = app_bundle.file_name()?.to_str()?;
+    // Only act on real .app bundles, and only inside /Applications (so we don't trash a dev tree).
+    if !current_name.ends_with(".app") { return None; }
+    if !parent_dir.to_str()?.starts_with("/Applications") { return None; }
+
+    let desired_name = "Blik Plan.app";
+    if current_name == desired_name { return None; }
+
+    let current_path = app_bundle.to_str()?.to_string();
+    let desired_path = parent_dir.join(desired_name).to_str()?.to_string();
+    Some(serde_json::json!({
+        "current_path": current_path,
+        "current_name": current_name,
+        "desired_path": desired_path,
+        "desired_name": desired_name,
+    }))
+}
+
+/// Schedule a rename of the running app bundle and quit. A small shell script waits a
+/// moment, moves the bundle, then re-opens it. Safe-no-op if rename target already exists.
+#[tauri::command]
+pub fn rename_bundle_and_restart(app: tauri::AppHandle) -> Result<(), String> {
+    let info = bundle_rename_needed().ok_or("no rename needed")?;
+    let current = info.get("current_path").and_then(|v| v.as_str()).ok_or("missing current_path")?;
+    let desired = info.get("desired_path").and_then(|v| v.as_str()).ok_or("missing desired_path")?;
+
+    // Write a one-shot script: wait for parent to exit, rename, reopen, delete itself.
+    let script_path = std::env::temp_dir().join("blik_plan_rename.sh");
+    let script = format!(
+        "#!/bin/sh\n\
+         sleep 1\n\
+         if [ ! -d \"{desired}\" ]; then\n\
+           mv \"{current}\" \"{desired}\" 2>/dev/null\n\
+         fi\n\
+         open \"{desired}\"\n\
+         rm -- \"$0\"\n",
+        current = current,
+        desired = desired,
+    );
+    std::fs::write(&script_path, script).map_err(|e| e.to_string())?;
+    // chmod +x
+    use std::os::unix::fs::PermissionsExt;
+    let mut perms = std::fs::metadata(&script_path).map_err(|e| e.to_string())?.permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&script_path, perms).map_err(|e| e.to_string())?;
+
+    std::process::Command::new("/bin/sh")
+        .arg(&script_path)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+
+    // Give the script a moment to start, then quit.
+    std::thread::sleep(std::time::Duration::from_millis(300));
+    app.exit(0);
+    Ok(())
 }
 
 #[tauri::command]

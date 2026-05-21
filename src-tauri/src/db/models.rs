@@ -12,6 +12,8 @@ pub struct Job {
     pub archived: bool,
     pub created_at: String,
     pub holidays_block_work: bool,
+    #[serde(default = "default_region")]
+    pub region: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,7 +24,11 @@ pub struct NewJob {
     pub project_start_date: NaiveDate,
     pub is_template: bool,
     pub holidays_block_work: bool,
+    #[serde(default = "default_region")]
+    pub region: String,
 }
+
+fn default_region() -> String { "ZA".into() }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Phase {
@@ -134,6 +140,7 @@ mod tests {
             archived: false,
             created_at: "2026-05-19T20:00:00".into(),
             holidays_block_work: true,
+            region: "ZA".into(),
         };
         let s = serde_json::to_string(&job).unwrap();
         let back: Job = serde_json::from_str(&s).unwrap();
@@ -145,6 +152,7 @@ mod tests {
         let p = Phase {
             id: 1, job_id: 1, name: "Plumbing".into(),
             colour: "#3B82F6".into(), order_index: 0, collapsed: true,
+            notes: String::new(),
         };
         let s = serde_json::to_string(&p).unwrap();
         let back: Phase = serde_json::from_str(&s).unwrap();

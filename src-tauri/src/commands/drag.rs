@@ -33,7 +33,7 @@ fn drag_task_inner(conn: &rusqlite::Connection, args: DragTaskArgs) -> GbResult<
     let job = job_repo::get(conn, args.job_id)?;
     let nwds: HashSet<NaiveDate> = nwd_repo::list_for_job(conn, args.job_id)?
         .into_iter()
-        .filter(|n| job.holidays_block_work || n.source != "sa_public_holiday")
+        .filter(|n| job.holidays_block_work || !n.source.ends_with("_holiday") && n.source != "sa_public_holiday")
         .map(|n| n.date)
         .collect();
 
@@ -83,6 +83,7 @@ mod tests {
             project_start_date: NaiveDate::from_ymd_opt(2026,6,5).unwrap(),
             is_template: false,
             holidays_block_work: true,
+            region: "ZA".into(),
         }).unwrap();
         let p = phase::create(&conn, &NewPhase {
             job_id: j.id, name: "P".into(), colour: "#000".into(),

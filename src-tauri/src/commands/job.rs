@@ -15,9 +15,12 @@ pub struct CreateJobArgs {
     pub is_template: bool,
     #[serde(default = "default_true")]
     pub holidays_block_work: bool,
+    #[serde(default = "default_region")]
+    pub region: String,
 }
 
 fn default_true() -> bool { true }
+fn default_region() -> String { "ZA".into() }
 
 #[tauri::command]
 pub fn list_jobs(db: State<Db>) -> GbResult<Vec<Job>> {
@@ -50,6 +53,7 @@ pub fn create_job(db: State<Db>, args: CreateJobArgs) -> GbResult<Job> {
         name: args.name, client: args.client, address: args.address,
         project_start_date: args.project_start_date, is_template: args.is_template,
         holidays_block_work: args.holidays_block_work,
+        region: args.region,
     })
 }
 
@@ -87,7 +91,7 @@ mod tests {
         let job = job_repo::create(&conn, &NewJob {
             name: "Sea Point".into(), client: None, address: None,
             project_start_date: NaiveDate::from_ymd_opt(2026,6,5).unwrap(),
-            is_template: false, holidays_block_work: true,
+            is_template: false, holidays_block_work: true, region: "ZA".into(),
         }).unwrap();
         let active = job_repo::list_active(&conn).unwrap();
         assert_eq!(active.len(), 1);

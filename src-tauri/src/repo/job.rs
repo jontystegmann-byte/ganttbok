@@ -5,8 +5,8 @@ use crate::{GbError, GbResult};
 
 pub fn create(conn: &Connection, new: &NewJob) -> GbResult<Job> {
     conn.execute(
-        "INSERT INTO job (name, client, address, project_start_date, is_template, holidays_block_work)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        "INSERT INTO job (name, client, address, project_start_date, is_template, holidays_block_work, region)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         params![
             new.name,
             new.client,
@@ -14,6 +14,7 @@ pub fn create(conn: &Connection, new: &NewJob) -> GbResult<Job> {
             new.project_start_date.to_string(),
             new.is_template as i64,
             new.holidays_block_work as i64,
+            new.region,
         ],
     )?;
     let id = conn.last_insert_rowid();
@@ -21,7 +22,7 @@ pub fn create(conn: &Connection, new: &NewJob) -> GbResult<Job> {
 }
 
 const SELECT_COLS: &str = "id, name, client, address, project_start_date, \
-    is_template, archived, created_at, holidays_block_work";
+    is_template, archived, created_at, holidays_block_work, region";
 
 pub fn get(conn: &Connection, id: i64) -> GbResult<Job> {
     conn.query_row(
@@ -75,14 +76,15 @@ pub fn update(conn: &Connection, job: &Job) -> GbResult<()> {
     let n = conn.execute(
         "UPDATE job SET name = ?1, client = ?2, address = ?3,
                         project_start_date = ?4, is_template = ?5, archived = ?6,
-                        holidays_block_work = ?7
-         WHERE id = ?8",
+                        holidays_block_work = ?7, region = ?8
+         WHERE id = ?9",
         params![
             job.name, job.client, job.address,
             job.project_start_date.to_string(),
             job.is_template as i64,
             job.archived as i64,
             job.holidays_block_work as i64,
+            job.region,
             job.id,
         ],
     )?;
@@ -116,6 +118,7 @@ fn row_to_job(r: &rusqlite::Row) -> rusqlite::Result<Job> {
         archived: r.get::<_, i64>(6)? != 0,
         created_at: r.get(7)?,
         holidays_block_work: r.get::<_, i64>(8)? != 0,
+        region: r.get(9)?,
     })
 }
 
@@ -132,6 +135,7 @@ mod tests {
             project_start_date: NaiveDate::from_ymd_opt(2026, 6, 5).unwrap(),
             is_template: false,
             holidays_block_work: true,
+            region: "ZA".into(),
         }
     }
 

@@ -36,17 +36,46 @@ pub fn delete(conn: &Connection, id: i64) -> GbResult<()> {
 }
 
 /// Insert SA public holidays into `no_work_day` for [from..to] inclusive, *without overwriting* manual entries.
+/// Kept for backwards-compat — new code should call `sync_holidays` with a region.
 pub fn sync_sa_holidays(conn: &Connection, job_id: i64, from: NaiveDate, to: NaiveDate) -> GbResult<i64> {
-    let mut inserted: i64 = 0;
+    sync_holidays(conn, job_id, "ZA", from, to)
+}
+
+/// Sync public holidays for the given region into `no_work_day` for [from..to] inclusive.
+/// `region` must be one of: "ZA" | "US" | "GB" | "IN" | "CN".
+/// Manual entries are preserved. All *_holiday entries for OTHER regions in the range are cleared
+/// (so switching a job's region replaces the holiday set cleanly).
+pub fn sync_holidays(conn: &Connection, job_id: i64, region: &str, from: NaiveDate, to: NaiveDate) -> GbResult<i64> {
+    use crate::calendar::{
+        sa_holidays::sa_holidays_for_range,
+        us_holidays::us_holidays_for_range,
+        gb_holidays::gb_holidays_for_range,
+        in_holidays::in_holidays_for_range,
+        cn_holidays::cn_holidays_for_range,
+        sa_holidays::Holiday,
+    };
+
+    let (holidays, source): (Vec<Holiday>, &'static str) = match region {
+        "ZA" => (sa_holidays_for_range(from, to), "za_holiday"),
+        "US" => (us_holidays_for_range(from, to), "us_holiday"),
+        "GB" => (gb_holidays_for_range(from, to), "gb_holiday"),
+        "IN" => (in_holidays_for_range(from, to), "in_holiday"),
+        "CN" => (cn_holidays_for_range(from, to), "cn_holiday"),
+        _ => return Err(crate::GbError::Validation(format!("unknown region {region}"))),
+    };
+
     let tx = conn.unchecked_transaction()?;
 
+    // Clear ALL holiday rows in range (including legacy sa_public_holiday + other regions).
     tx.execute(
-        "DELETE FROM no_work_day WHERE job_id = ?1 AND source = 'sa_public_holiday'
-                                AND date >= ?2 AND date <= ?3",
+        "DELETE FROM no_work_day
+         WHERE job_id = ?1 AND date >= ?2 AND date <= ?3
+           AND source IN ('za_holiday','us_holiday','gb_holiday','in_holiday','cn_holiday','sa_public_holiday')",
         params![job_id, from.to_string(), to.to_string()],
     )?;
 
-    for h in sa_holidays_for_range(from, to) {
+    let mut inserted: i64 = 0;
+    for h in holidays {
         let manual_exists: i64 = tx.query_row(
             "SELECT COUNT(*) FROM no_work_day WHERE job_id = ?1 AND date = ?2 AND source = 'manual'",
             params![job_id, h.date.to_string()],
@@ -54,9 +83,9 @@ pub fn sync_sa_holidays(conn: &Connection, job_id: i64, from: NaiveDate, to: Nai
         )?;
         if manual_exists == 0 {
             tx.execute(
-                "INSERT INTO no_work_day (job_id, date, reason, source)
-                 VALUES (?1, ?2, ?3, 'sa_public_holiday')",
-                params![job_id, h.date.to_string(), h.name],
+                "INSERT OR IGNORE INTO no_work_day (job_id, date, reason, source)
+                 VALUES (?1, ?2, ?3, ?4)",
+                params![job_id, h.date.to_string(), h.name, source],
             )?;
             inserted += 1;
         }
@@ -93,6 +122,7 @@ mod tests {
             project_start_date: NaiveDate::from_ymd_opt(2026,1,1).unwrap(),
             is_template: false,
             holidays_block_work: true,
+            region: "ZA".into(),
         }).unwrap();
         let n = sync_sa_holidays(
             &conn, j.id,
@@ -110,6 +140,7 @@ mod tests {
             project_start_date: NaiveDate::from_ymd_opt(2026,1,1).unwrap(),
             is_template: false,
             holidays_block_work: true,
+            region: "ZA".into(),
         }).unwrap();
         create(&conn, &NewNoWorkDay {
             job_id: j.id,

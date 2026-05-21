@@ -46,3 +46,18 @@ pub fn sync_sa_holidays(db: State<Db>, args: SyncSaArgs) -> GbResult<i64> {
     let conn = db.0.lock().unwrap();
     nwd_repo::sync_sa_holidays(&conn, args.job_id, args.from, args.to)
 }
+
+#[derive(Debug, Deserialize)]
+pub struct SyncHolidaysArgs {
+    pub job_id: i64,
+    pub region: String,
+    pub from: NaiveDate,
+    pub to: NaiveDate,
+}
+
+/// Generic per-region holiday sync. Replaces sync_sa_holidays for new code.
+#[tauri::command]
+pub fn sync_holidays(db: State<Db>, args: SyncHolidaysArgs) -> GbResult<i64> {
+    let conn = db.0.lock().unwrap();
+    nwd_repo::sync_holidays(&conn, args.job_id, &args.region, args.from, args.to)
+}

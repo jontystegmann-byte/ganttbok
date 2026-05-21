@@ -206,11 +206,25 @@
 
     {#if store.currentJob}
       <section>
+        <h3>Region — this job</h3>
+        <select class="text-input"
+          value={store.currentJob.region}
+          onchange={(e) => store.setCurrentJobRegion((e.currentTarget as HTMLSelectElement).value)}>
+          <option value="ZA">🇿🇦 South Africa</option>
+          <option value="US">🇺🇸 United States</option>
+          <option value="GB">🇬🇧 United Kingdom</option>
+          <option value="IN">🇮🇳 India</option>
+          <option value="CN">🇨🇳 China</option>
+        </select>
+        <p class="hint">Sets which public holidays are auto-synced. New jobs default to this setting.</p>
+      </section>
+
+      <section>
         <h3>Public holidays — this job</h3>
         <label class="toggle">
           <input type="checkbox" checked={store.currentJob.holidays_block_work}
             onchange={(e) => store.setJobHolidaysBlockWork((e.currentTarget as HTMLInputElement).checked)} />
-          <span>Split bars around SA public holidays</span>
+          <span>Split bars around public holidays</span>
         </label>
         <p class="hint">
           {#if store.currentJob.holidays_block_work}Bars step around holidays — task extends one day.

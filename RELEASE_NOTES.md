@@ -1,15 +1,22 @@
-Gantt Bok v1.2.0 — print fix, weekend toggle, todo notes, polish
+Blik Plan v1.3.0 — rebrand, 5-region holidays, today line
+
+🎉 GANTT BOK IS NOW BLIK PLAN.
+Same app, same auto-update channel, same data (your jobs carry over untouched). New name, new red-and-white BP logo, and a stack of new features below.
+
+ON FIRST LAUNCH after this update, you'll see a small "Rebranded" banner offering to rename `Gantt Bok.app` → `Blik Plan.app` in your Applications folder. One click does it. Skip it if you prefer; the dock and menu already show the new name regardless.
 
 NEW
-- Print landscape — A3 landscape now applied automatically by the app before the system print dialog opens. No more portrait surprise.
-- Weekend toggle in Settings — flip on to show Saturday + Sunday columns for projects where you work on weekends.
-- Column hover highlight — the day column under your cursor gets a faint blue tint, making it easy to see exactly which day you're hovering.
-- Inline edit job name and project start date — both live in the new Settings popover, save on blur.
-- Notes panel — a per-job side drawer (notepad icon, bottom-left). Each phase gets its own colour-coded heading and a free-text bullet area. Has its own A4 portrait Print button — separate from the Gantt landscape print.
-- Phase drag-to-reorder now actually works — drag a phase row in the left rail to a new position; order persists.
+- Public-holiday regions: pick from **South Africa · United States · United Kingdom · India · China** in Settings. Changing region re-syncs the holidays for that job. New jobs default to your last-used region.
+- **Today line**: a red vertical line tracks the current date across the whole chart, with a date flag at the top.
+- **Past-task fade**: tasks that finished before today render dimmed so you can see at a glance what's still in flight.
+- **Auto-scroll to current week** when you open a job.
+- **Inline edit job name + project start date** in the Settings popover.
 
 CHANGED
-- Bottom-left controls reorganised. Settings, Notes, and the version/update badge now live in the sidebar footer above the New job button — no more overlap.
+- Brand palette switched from blue to **Blik Red** (#E11D2A) across selections, hovers, the dependency port, the today line, and the new logo.
+- Type system: Inter for UI, JetBrains Mono for meta and dates.
+- New sidebar header with the BP block monogram + BLIK Plan wordmark.
 
-KNOWN
-- Universal zoom slider deferred to a later release; the CSS `zoom` approach we tried interfered with the new column-hover positioning. Will reappear in a clean form.
+UNDER THE HOOD
+- DB schema bumped to v5: added `job.region` column; `no_work_day.source` CHECK constraint broadened to include the 4 new region tags. Existing SA holidays were auto-migrated to the new `za_holiday` source.
+- India + China use hard-coded annual lookup tables for lunar/lunisolar holidays (Diwali, Holi, Spring Festival, etc.), covering 2026–2030 in this release. Years beyond fall back to fixed Gregorian dates until tables are extended.

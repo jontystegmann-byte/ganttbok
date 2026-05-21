@@ -63,6 +63,7 @@ pub fn run() {
             commands::no_work_day::add_manual_no_work_day,
             commands::no_work_day::delete_no_work_day,
             commands::no_work_day::sync_sa_holidays,
+            commands::no_work_day::sync_holidays,
             commands::meta::startup_info,
             commands::meta::mark_clean_shutdown,
             commands::meta::set_last_open_job,
@@ -74,6 +75,9 @@ pub fn run() {
             commands::meta::set_holidays_block_work_default,
             commands::meta::set_include_weekends,
             commands::meta::set_ui_scale,
+            commands::meta::set_region_default,
+            commands::meta::bundle_rename_needed,
+            commands::meta::rename_bundle_and_restart,
             commands::sync::resync_job_state,
         ])
         .on_window_event(|window, event| {

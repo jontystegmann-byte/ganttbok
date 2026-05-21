@@ -5,6 +5,7 @@
   import NoWorkColumn from './NoWorkColumn.svelte';
   import WeekGridLines from './WeekGridLines.svelte';
   import HoverColumn from './HoverColumn.svelte';
+  import TodayLine from './TodayLine.svelte';
   import TaskBar from './TaskBar.svelte';
   import PhaseBar from './PhaseBar.svelte';
   import DependencyArrow from './DependencyArrow.svelte';
@@ -73,6 +74,7 @@
       <NoWorkColumn {days} {totalHeight} />
       <WeekGridLines {days} {totalHeight} cellWidth={CELL} />
       <HoverColumn {totalHeight} cellWidth={CELL} />
+      <TodayLine {days} {totalHeight} cellWidth={CELL} />
       <svg
         width={days.length * CELL}
         height={totalHeight}

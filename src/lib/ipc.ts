@@ -49,6 +49,8 @@ export const listNoWorkDays         = (jobId: number)                => invoke<N
 export const addManualNoWorkDay     = (args: AddManualArgs)          => invoke<NoWorkDay>('add_manual_no_work_day', { args });
 export const deleteNoWorkDay        = (id: number)                   => invoke<void>('delete_no_work_day', { id });
 export const syncSaHolidays         = (args: SyncSaArgs)             => invoke<number>('sync_sa_holidays', { args });
+export const syncHolidays = (args: { job_id: number; region: string; from: string; to: string }) =>
+  invoke<number>('sync_holidays', { args });
 
 // Meta
 export const startupInfo        = ()                                 => invoke<StartupInfo>('startup_info');
@@ -60,6 +62,7 @@ export const setDurationUnit    = (unit: 'weeks' | 'days')           => invoke<v
 export const setHolidaysBlockWorkDefault = (value: boolean)          => invoke<void>('set_holidays_block_work_default', { value });
 export const setIncludeWeekends = (value: boolean)                   => invoke<void>('set_include_weekends', { value });
 export const setUiScale         = (value: number)                    => invoke<void>('set_ui_scale', { value });
+export const setRegionDefault   = (region: string)                   => invoke<void>('set_region_default', { region });
 
 // Resync (used by undo/redo + manual ⌘S to push local state to backend in one transaction)
 export interface ResyncArgs {

@@ -36,6 +36,7 @@ fn save_as_template_inner(conn: &rusqlite::Connection, source_id: i64, name: &st
         project_start_date: source.project_start_date,
         is_template: true,
         holidays_block_work: source.holidays_block_work,
+        region: source.region.clone(),
     })?;
     let phases = phase_repo::list_for_job(conn, source.id)?;
     for p in phases {
@@ -73,6 +74,7 @@ fn instantiate_template_inner(conn: &rusqlite::Connection, args: InstantiateArgs
         project_start_date: args.project_start_date,
         is_template: false,
         holidays_block_work: template.holidays_block_work,
+        region: template.region.clone(),
     })?;
     let phases = phase_repo::list_for_job(conn, template.id)?;
     for p in phases {
@@ -110,6 +112,7 @@ mod tests {
             name: "Std reno".into(), client: None, address: None,
             project_start_date: NaiveDate::from_ymd_opt(2026,6,5).unwrap(),
             is_template: false, holidays_block_work: true,
+            region: "ZA".into(),
         }).unwrap();
         let p = phase_repo::create(&conn, &NewPhase {
             job_id: source.id, name: "Plumbing".into(), colour: "#3B82F6".into(),
