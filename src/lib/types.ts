@@ -25,6 +25,25 @@ export interface Phase {
   notes: string;
 }
 
+export interface Contact {
+  id: number;
+  name: string;
+  telegram_chat_id: string | null;
+  telegram_handle: string | null;
+  notes: string;
+  created_at: string;
+}
+
+export interface NudgeResult {
+  task_id: number;
+  task_name: string;
+  contact_name: string;
+  template_key: string;
+  days: number;
+  success: boolean;
+  error: string | null;
+}
+
 export interface Task {
   id: number;
   phase_id: number;
@@ -33,6 +52,8 @@ export interface Task {
   duration_workdays: number;
   order_index: number;
   notes: string | null;
+  contact_id: number | null;
+  last_chaser_sent_at: string | null;
 }
 
 export interface Dependency {

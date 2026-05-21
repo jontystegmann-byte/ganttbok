@@ -60,6 +60,28 @@ pub struct Task {
     pub duration_workdays: i64,
     pub order_index: i64,
     pub notes: Option<String>,
+    #[serde(default)]
+    pub contact_id: Option<i64>,
+    #[serde(default)]
+    pub last_chaser_sent_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Contact {
+    pub id: i64,
+    pub name: String,
+    pub telegram_chat_id: Option<String>,
+    pub telegram_handle: Option<String>,
+    pub notes: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewContact {
+    pub name: String,
+    pub telegram_chat_id: Option<String>,
+    pub telegram_handle: Option<String>,
+    pub notes: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -165,6 +187,7 @@ mod tests {
             id: 1, phase_id: 1, name: "First-fix".into(),
             start_date: NaiveDate::from_ymd_opt(2026, 6, 8).unwrap(),
             duration_workdays: 3, order_index: 0, notes: None,
+            contact_id: None, last_chaser_sent_at: None,
         };
         let s = serde_json::to_string(&t).unwrap();
         let back: Task = serde_json::from_str(&s).unwrap();

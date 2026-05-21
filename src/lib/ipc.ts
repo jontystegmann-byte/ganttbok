@@ -3,6 +3,7 @@ import type {
   Job, Phase, Task, Dependency, NoWorkDay, StartupInfo, DragResult,
   CreateJobArgs, CreatePhaseArgs, CreateTaskArgs, CreateDepArgs,
   AddManualArgs, SyncSaArgs, InstantiateArgs, DragTaskArgs,
+  Contact, NudgeResult,
 } from './types';
 
 // Jobs
@@ -63,6 +64,22 @@ export const setHolidaysBlockWorkDefault = (value: boolean)          => invoke<v
 export const setIncludeWeekends = (value: boolean)                   => invoke<void>('set_include_weekends', { value });
 export const setUiScale         = (value: number)                    => invoke<void>('set_ui_scale', { value });
 export const setRegionDefault   = (region: string)                   => invoke<void>('set_region_default', { region });
+export const setMetaValue       = (key: string, value: string)       => invoke<void>('set_meta_value', { key, value });
+export const getMetaValue       = (key: string)                      => invoke<string | null>('get_meta_value', { key });
+
+// Chaser
+type ContactArgs = { id?: number | null; name: string; telegram_chat_id: string | null; telegram_handle: string | null; notes: string };
+export const listContacts        = ()                                  => invoke<Contact[]>('list_contacts');
+export const createContact       = (args: ContactArgs)                 => invoke<Contact>('create_contact', { args });
+export const updateContact       = (args: ContactArgs)                 => invoke<void>('update_contact', { args });
+export const deleteContact       = (id: number)                        => invoke<void>('delete_contact', { id });
+export const assignTaskContact   = (args: { task_id: number; contact_id: number | null }) =>
+  invoke<void>('assign_task_contact', { args });
+export const sendChaser          = (args: { task_id: number; template_key: string; custom_text?: string | null }) =>
+  invoke<void>('send_chaser', { args });
+export const testTelegram        = (args: { token: string; chat_id: string }) =>
+  invoke<void>('test_telegram', { args });
+export const runChaserCheck      = ()                                  => invoke<NudgeResult[]>('run_chaser_check');
 
 // Resync (used by undo/redo + manual ⌘S to push local state to backend in one transaction)
 export interface ResyncArgs {

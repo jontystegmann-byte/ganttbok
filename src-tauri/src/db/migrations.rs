@@ -92,6 +92,20 @@ const MIGRATIONS: &[&str] = &[
 
     DROP TABLE no_work_day_old;
     "#,
+    // v6 — Chaser feature: contacts + per-task contact + per-task last-chaser-sent timestamp.
+    r#"
+    CREATE TABLE contact (
+        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+        name                TEXT    NOT NULL,
+        telegram_chat_id    TEXT,
+        telegram_handle     TEXT,
+        notes               TEXT    NOT NULL DEFAULT '',
+        created_at          TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    ALTER TABLE task ADD COLUMN contact_id INTEGER REFERENCES contact(id) ON DELETE SET NULL;
+    ALTER TABLE task ADD COLUMN last_chaser_sent_at TEXT;
+    "#,
 ];
 
 pub fn apply_migrations(conn: &Connection) -> GbResult<()> {

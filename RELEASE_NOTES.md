@@ -1,22 +1,19 @@
-Blik Plan v1.3.0 — rebrand, 5-region holidays, today line
-
-🎉 GANTT BOK IS NOW BLIK PLAN.
-Same app, same auto-update channel, same data (your jobs carry over untouched). New name, new red-and-white BP logo, and a stack of new features below.
-
-ON FIRST LAUNCH after this update, you'll see a small "Rebranded" banner offering to rename `Gantt Bok.app` → `Blik Plan.app` in your Applications folder. One click does it. Skip it if you prefer; the dock and menu already show the new name regardless.
+Blik Plan v1.4.0 — Chaser feature
 
 NEW
-- Public-holiday regions: pick from **South Africa · United States · United Kingdom · India · China** in Settings. Changing region re-syncs the holidays for that job. New jobs default to your last-used region.
-- **Today line**: a red vertical line tracks the current date across the whole chart, with a date flag at the top.
-- **Past-task fade**: tasks that finished before today render dimmed so you can see at a glance what's still in flight.
-- **Auto-scroll to current week** when you open a job.
-- **Inline edit job name + project start date** in the Settings popover.
+- **Contacts page**. Click the people icon in the sidebar footer to add and manage contacts (name, Telegram chat_id, handle, notes). Each contact gets a per-row "Send test ping" button to verify the setup.
+- **Telegram-bot chasers**. Assign a contact to any task. Three one-click chaser templates: *Manual update*, *Deadline approaching*, *Behind schedule*. Plus a free-text *Custom message* option. Editable templates with `{task}`, `{days}`, `{contact_name}`, `{job_name}` placeholders.
+- **Auto-nudges** fire on app launch and on window focus (debounced to once every 5 min). For each assigned task whose end date is within the threshold (default 3 days), the bot sends a "deadline approaching" message. For each overdue task, it sends "behind schedule". A 24-hour throttle prevents double-sends.
+- **Settings → Chaser** section: bot token, test chat_id + Test button, threshold slider (1–14 days), auto-nudge toggle, 3 editable message templates.
 
-CHANGED
-- Brand palette switched from blue to **Blik Red** (#E11D2A) across selections, hovers, the dependency port, the today line, and the new logo.
-- Type system: Inter for UI, JetBrains Mono for meta and dates.
-- New sidebar header with the BP block monogram + BLIK Plan wordmark.
+SETUP
+- In Telegram, search for `@BotFather` → `/newbot` → follow prompts → copy the token.
+- Paste the token into Settings → Chaser → Bot token.
+- For each contact: have them search for `@userinfobot` in Telegram and read off the numeric ID. Add a contact and paste it as the Telegram chat_id.
+- Each contact must also send `/start` to your bot once so the bot has permission to message them.
+- Assign contacts to tasks via the new "Assigned to" picker in the task details panel.
 
 UNDER THE HOOD
-- DB schema bumped to v5: added `job.region` column; `no_work_day.source` CHECK constraint broadened to include the 4 new region tags. Existing SA holidays were auto-migrated to the new `za_holiday` source.
-- India + China use hard-coded annual lookup tables for lunar/lunisolar holidays (Diwali, Holi, Spring Festival, etc.), covering 2026–2030 in this release. Years beyond fall back to fixed Gregorian dates until tables are extended.
+- DB schema bumped to v6: new `contact` table; `task` gains `contact_id` (nullable FK with `ON DELETE SET NULL`) and `last_chaser_sent_at` for 24h throttling.
+- Bot token + threshold + template strings stored in app meta. Token is plain-text local-only (your DB lives in `~/Library/Application Support/Gantt Bok/`).
+- New `reqwest` dep (rustls-tls + blocking + json) for the Telegram API call.

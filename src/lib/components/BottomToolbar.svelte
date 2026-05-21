@@ -54,6 +54,49 @@
   /* ---------- Settings popover ---------- */
   let settingsOpen = $state(false);
 
+  /* ---------- Chaser settings (lazy-loaded when popover opens) ---------- */
+  let chaserLoaded = $state(false);
+  let chaserToken = $state('');
+  let chaserThreshold = $state(3);
+  let chaserAutoEnabled = $state(true);
+  let templateManual = $state('');
+  let templateApproaching = $state('');
+  let templateOverdue = $state('');
+  let testChatId = $state('');
+  let testStatus = $state<'idle' | 'sending' | 'ok' | 'error'>('idle');
+  let testError = $state('');
+
+  async function loadChaserSettings() {
+    if (chaserLoaded) return;
+    chaserToken         = (await ipc.getMetaValue('telegram_bot_token')) ?? '';
+    const t             = await ipc.getMetaValue('chaser_threshold_days');
+    chaserThreshold     = t ? parseInt(t) || 3 : 3;
+    const auto          = await ipc.getMetaValue('chaser_auto_enabled');
+    chaserAutoEnabled   = auto !== '0';
+    templateManual      = (await ipc.getMetaValue('chaser_template_manual')) ?? 'Update me on *{task}* — what\'s the latest?';
+    templateApproaching = (await ipc.getMetaValue('chaser_template_approaching')) ?? '*{task}* deadline is in {days} days — still on track?';
+    templateOverdue     = (await ipc.getMetaValue('chaser_template_overdue')) ?? '*{task}* was due {days_abs} days ago — what\'s the blocker?';
+    chaserLoaded = true;
+  }
+
+  async function saveChaserField(key: string, value: string) {
+    try { await ipc.setMetaValue(key, value); } catch (e) { console.error('saveChaserField', e); }
+  }
+
+  async function runTest() {
+    testStatus = 'sending'; testError = '';
+    try {
+      await ipc.testTelegram({ token: chaserToken, chat_id: testChatId });
+      testStatus = 'ok';
+    } catch (e) {
+      testStatus = 'error'; testError = String(e);
+    }
+  }
+
+  $effect(() => {
+    if (settingsOpen) loadChaserSettings();
+  });
+
   /* ---------- Notes panel ---------- */
   let notesOpen = $state(false);
 
@@ -101,6 +144,15 @@
       <polyline points="14 2 14 8 20 8"/>
       <line x1="9" y1="13" x2="15" y2="13"/>
       <line x1="9" y1="17" x2="15" y2="17"/>
+    </svg>
+  </button>
+
+  <button class="icon-btn" onclick={() => (store.showContactsPage = true)} title="Contacts" aria-label="Contacts">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/>
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
     </svg>
   </button>
 </div>
@@ -203,6 +255,56 @@
     </section>
     -->
 
+
+    <section>
+      <h3>Chaser (Telegram)</h3>
+      <label class="seg-label">Bot token</label>
+      <input
+        type="password"
+        class="text-input"
+        bind:value={chaserToken}
+        onblur={() => saveChaserField('telegram_bot_token', chaserToken)}
+        placeholder="123456:ABC-def..."
+      />
+      <p class="hint">Get from <code>@BotFather</code> in Telegram. Stored locally only.</p>
+
+      <label class="seg-label" style="margin-top: var(--sp-3)">Test chat_id</label>
+      <div style="display: flex; gap: var(--sp-2)">
+        <input type="text" class="text-input" bind:value={testChatId} placeholder="987654321" />
+        <button class="seg-button" onclick={runTest} disabled={!chaserToken || !testChatId || testStatus === 'sending'}>
+          {#if testStatus === 'sending'}…
+          {:else if testStatus === 'ok'}✓
+          {:else if testStatus === 'error'}✗
+          {:else}Test{/if}
+        </button>
+      </div>
+      {#if testStatus === 'error'}<p class="hint err">{testError}</p>{/if}
+
+      <label class="seg-label" style="margin-top: var(--sp-3)">Nudge me when deadline is within {chaserThreshold} day{chaserThreshold === 1 ? '' : 's'}</label>
+      <input type="range" min="1" max="14" step="1" bind:value={chaserThreshold}
+        class="slider"
+        onchange={() => saveChaserField('chaser_threshold_days', String(chaserThreshold))} />
+
+      <label class="toggle" style="margin-top: var(--sp-3)">
+        <input type="checkbox" bind:checked={chaserAutoEnabled}
+          onchange={() => saveChaserField('chaser_auto_enabled', chaserAutoEnabled ? '1' : '0')} />
+        <span>Send chasers automatically on app launch + focus</span>
+      </label>
+
+      <details style="margin-top: var(--sp-3)">
+        <summary class="seg-label" style="cursor: pointer">Message templates</summary>
+        <label class="seg-label" style="margin-top: var(--sp-2)">Manual ping</label>
+        <textarea class="text-input" rows="2" bind:value={templateManual}
+          onblur={() => saveChaserField('chaser_template_manual', templateManual)}></textarea>
+        <label class="seg-label" style="margin-top: var(--sp-2)">Deadline approaching</label>
+        <textarea class="text-input" rows="2" bind:value={templateApproaching}
+          onblur={() => saveChaserField('chaser_template_approaching', templateApproaching)}></textarea>
+        <label class="seg-label" style="margin-top: var(--sp-2)">Overdue</label>
+        <textarea class="text-input" rows="2" bind:value={templateOverdue}
+          onblur={() => saveChaserField('chaser_template_overdue', templateOverdue)}></textarea>
+        <p class="hint">Placeholders: <code>{'{task}'}</code>, <code>{'{days}'}</code>, <code>{'{days_abs}'}</code>, <code>{'{contact_name}'}</code>, <code>{'{job_name}'}</code></p>
+      </details>
+    </section>
 
     {#if store.currentJob}
       <section>
@@ -339,7 +441,13 @@
   .toggle input { width: 16px; height: 16px; cursor: pointer; }
   .slider { width: 100%; }
   .slider-labels { display: flex; justify-content: space-between; font-size: var(--font-size-xs); color: var(--c-text-muted); margin-top: var(--sp-1); }
-  .text-input { width: 100%; padding: var(--sp-2); border: 1px solid var(--c-border); border-radius: 4px; font-size: var(--font-size-sm); }
+  .text-input { width: 100%; padding: var(--sp-2); border: 1px solid var(--c-border); border-radius: 4px; font-size: var(--font-size-sm); font-family: inherit; }
+  textarea.text-input { resize: vertical; min-height: 44px; }
+  .seg-label { display: block; font-size: var(--font-size-xs); color: var(--c-text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .seg-button { background: var(--c-bg); border: 1px solid var(--c-border); padding: var(--sp-2) var(--sp-3); border-radius: 4px; cursor: pointer; font-size: var(--font-size-sm); }
+  .seg-button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .hint code { font-family: var(--font-mono); background: var(--c-accent-fade); color: var(--c-accent); padding: 1px 4px; border-radius: 2px; }
+  .hint.err { color: #C8121E; }
 
   /* ============ Notes panel ============ */
   .todo-panel {

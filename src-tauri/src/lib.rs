@@ -1,4 +1,5 @@
 pub mod calendar;
+pub mod chaser;
 pub mod commands;
 pub mod db;
 pub mod deps;
@@ -76,8 +77,18 @@ pub fn run() {
             commands::meta::set_include_weekends,
             commands::meta::set_ui_scale,
             commands::meta::set_region_default,
+            commands::meta::set_meta_value,
+            commands::meta::get_meta_value,
             commands::meta::bundle_rename_needed,
             commands::meta::rename_bundle_and_restart,
+            commands::chaser::list_contacts,
+            commands::chaser::create_contact,
+            commands::chaser::update_contact,
+            commands::chaser::delete_contact,
+            commands::chaser::assign_task_contact,
+            commands::chaser::send_chaser,
+            commands::chaser::test_telegram,
+            commands::chaser::run_chaser_check,
             commands::sync::resync_job_state,
         ])
         .on_window_event(|window, event| {

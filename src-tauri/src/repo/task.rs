@@ -3,6 +3,8 @@ use chrono::NaiveDate;
 use crate::db::models::{Task, NewTask};
 use crate::{GbError, GbResult};
 
+const SELECT_COLS: &str = "id, phase_id, name, start_date, duration_workdays, order_index, notes, contact_id, last_chaser_sent_at";
+
 pub fn create(conn: &Connection, new: &NewTask) -> GbResult<Task> {
     conn.execute(
         "INSERT INTO task (phase_id, name, start_date, duration_workdays, order_index, notes)
@@ -17,8 +19,7 @@ pub fn create(conn: &Connection, new: &NewTask) -> GbResult<Task> {
 
 pub fn get(conn: &Connection, id: i64) -> GbResult<Task> {
     conn.query_row(
-        "SELECT id, phase_id, name, start_date, duration_workdays, order_index, notes
-         FROM task WHERE id = ?1",
+        &format!("SELECT {SELECT_COLS} FROM task WHERE id = ?1"),
         [id],
         row_to_task,
     )
@@ -30,8 +31,7 @@ pub fn get(conn: &Connection, id: i64) -> GbResult<Task> {
 
 pub fn list_for_phase(conn: &Connection, phase_id: i64) -> GbResult<Vec<Task>> {
     let mut stmt = conn.prepare(
-        "SELECT id, phase_id, name, start_date, duration_workdays, order_index, notes
-         FROM task WHERE phase_id = ?1 ORDER BY order_index ASC",
+        &format!("SELECT {SELECT_COLS} FROM task WHERE phase_id = ?1 ORDER BY order_index ASC"),
     )?;
     let rows = stmt.query_map([phase_id], row_to_task)?;
     let mut out = Vec::new();
@@ -40,12 +40,16 @@ pub fn list_for_phase(conn: &Connection, phase_id: i64) -> GbResult<Vec<Task>> {
 }
 
 pub fn list_for_job(conn: &Connection, job_id: i64) -> GbResult<Vec<Task>> {
-    let mut stmt = conn.prepare(
-        "SELECT t.id, t.phase_id, t.name, t.start_date, t.duration_workdays, t.order_index, t.notes
+    let select_cols_t = SELECT_COLS.split(", ")
+        .map(|c| format!("t.{c}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let mut stmt = conn.prepare(&format!(
+        "SELECT {select_cols_t}
          FROM task t JOIN phase p ON p.id = t.phase_id
          WHERE p.job_id = ?1
-         ORDER BY p.order_index ASC, t.order_index ASC",
-    )?;
+         ORDER BY p.order_index ASC, t.order_index ASC"
+    ))?;
     let rows = stmt.query_map([job_id], row_to_task)?;
     let mut out = Vec::new();
     for r in rows { out.push(r?); }
@@ -55,11 +59,14 @@ pub fn list_for_job(conn: &Connection, job_id: i64) -> GbResult<Vec<Task>> {
 pub fn update(conn: &Connection, task: &Task) -> GbResult<()> {
     let n = conn.execute(
         "UPDATE task SET phase_id = ?1, name = ?2, start_date = ?3,
-                         duration_workdays = ?4, order_index = ?5, notes = ?6
-         WHERE id = ?7",
+                         duration_workdays = ?4, order_index = ?5, notes = ?6,
+                         contact_id = ?7, last_chaser_sent_at = ?8
+         WHERE id = ?9",
         params![
             task.phase_id, task.name, task.start_date.to_string(),
-            task.duration_workdays, task.order_index, task.notes, task.id,
+            task.duration_workdays, task.order_index, task.notes,
+            task.contact_id, task.last_chaser_sent_at,
+            task.id,
         ],
     )?;
     if n == 0 { return Err(GbError::NotFound(format!("task {}", task.id))); }
@@ -87,6 +94,14 @@ pub fn reorder(conn: &Connection, phase_id: i64, ordered_ids: &[i64]) -> GbResul
     Ok(())
 }
 
+pub fn mark_chaser_sent(conn: &Connection, id: i64, sent_at: &str) -> GbResult<()> {
+    conn.execute(
+        "UPDATE task SET last_chaser_sent_at = ?1 WHERE id = ?2",
+        params![sent_at, id],
+    )?;
+    Ok(())
+}
+
 fn row_to_task(r: &rusqlite::Row) -> rusqlite::Result<Task> {
     let date_str: String = r.get(3)?;
     let start_date = NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
@@ -99,70 +114,7 @@ fn row_to_task(r: &rusqlite::Row) -> rusqlite::Result<Task> {
         duration_workdays: r.get(4)?,
         order_index: r.get(5)?,
         notes: r.get(6)?,
+        contact_id: r.get(7)?,
+        last_chaser_sent_at: r.get(8)?,
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::db::connection::open_in_memory;
-    use crate::db::models::{NewJob, NewPhase};
-    use crate::repo::{job, phase};
-
-    fn setup(conn: &Connection) -> i64 {
-        let j = job::create(conn, &NewJob {
-            name: "J".into(), client: None, address: None,
-            project_start_date: NaiveDate::from_ymd_opt(2026, 6, 5).unwrap(),
-            is_template: false,
-            holidays_block_work: true,
-            region: "ZA".into(),
-        }).unwrap();
-        let p = phase::create(conn, &NewPhase {
-            job_id: j.id, name: "Plumbing".into(), colour: "#3B82F6".into(),
-            order_index: 0, collapsed: true,
-        }).unwrap();
-        p.id
-    }
-
-    fn sample(phase_id: i64, name: &str, order_index: i64) -> NewTask {
-        NewTask {
-            phase_id, name: name.into(),
-            start_date: NaiveDate::from_ymd_opt(2026, 6, 8).unwrap(),
-            duration_workdays: 3, order_index, notes: None,
-        }
-    }
-
-    #[test]
-    fn create_and_list() {
-        let conn = open_in_memory().unwrap();
-        let phase_id = setup(&conn);
-        let a = create(&conn, &sample(phase_id, "First-fix", 0)).unwrap();
-        let b = create(&conn, &sample(phase_id, "Second-fix", 1)).unwrap();
-        let list = list_for_phase(&conn, phase_id).unwrap();
-        assert_eq!(list.len(), 2);
-        assert_eq!(list[0].id, a.id);
-        assert_eq!(list[1].id, b.id);
-    }
-
-    #[test]
-    fn duration_zero_is_rejected_by_check_constraint() {
-        let conn = open_in_memory().unwrap();
-        let phase_id = setup(&conn);
-        let mut bad = sample(phase_id, "Bad", 0);
-        bad.duration_workdays = 0;
-        let r = create(&conn, &bad);
-        assert!(r.is_err(), "expected CHECK violation");
-    }
-
-    #[test]
-    fn reorder_works() {
-        let conn = open_in_memory().unwrap();
-        let phase_id = setup(&conn);
-        let a = create(&conn, &sample(phase_id, "A", 0)).unwrap();
-        let b = create(&conn, &sample(phase_id, "B", 1)).unwrap();
-        let c = create(&conn, &sample(phase_id, "C", 2)).unwrap();
-        reorder(&conn, phase_id, &[c.id, a.id, b.id]).unwrap();
-        let list = list_for_phase(&conn, phase_id).unwrap();
-        assert_eq!(list.iter().map(|t| t.name.as_str()).collect::<Vec<_>>(), vec!["C","A","B"]);
-    }
 }

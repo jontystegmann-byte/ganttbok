@@ -94,6 +94,30 @@ pub fn set_region_default(db: State<Db>, region: String) -> GbResult<()> {
     meta_set(&conn, "region_default", &region)
 }
 
+/// Allowlisted generic meta setter. Used by Chaser settings + any future small prefs.
+#[tauri::command]
+pub fn set_meta_value(db: State<Db>, key: String, value: String) -> GbResult<()> {
+    const ALLOWED: &[&str] = &[
+        "telegram_bot_token",
+        "chaser_threshold_days",
+        "chaser_template_manual",
+        "chaser_template_approaching",
+        "chaser_template_overdue",
+        "chaser_auto_enabled",
+    ];
+    if !ALLOWED.contains(&key.as_str()) {
+        return Err(crate::GbError::Validation(format!("meta key '{key}' not in allowlist")));
+    }
+    let conn = db.0.lock().unwrap();
+    meta_set(&conn, &key, &value)
+}
+
+#[tauri::command]
+pub fn get_meta_value(db: State<Db>, key: String) -> GbResult<Option<String>> {
+    let conn = db.0.lock().unwrap();
+    meta_get(&conn, &key)
+}
+
 /// Detect a mismatch between the on-disk `.app` folder name and the productName.
 /// Returns Some({current, desired}) when the user is running from `/Applications/Gantt Bok.app`
 /// (or any other stale-named bundle) and should be offered a rename. Returns None when

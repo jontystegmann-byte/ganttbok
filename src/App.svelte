@@ -8,6 +8,7 @@
   import PrintOptions from './lib/print/PrintOptions.svelte';
   import Toast from './lib/components/Toast.svelte';
   import RenameBundlePrompt from './lib/components/RenameBundlePrompt.svelte';
+  import ContactsPage from './lib/contacts/ContactsPage.svelte';
 
   onMount(async () => {
     await store.bootstrap();
@@ -75,6 +76,9 @@
 
 <SavedIndicator />
 <RenameBundlePrompt />
+{#if store.showContactsPage}
+  <ContactsPage />
+{/if}
 <Toast />
 
 {#if store.showPrintOptions}

@@ -1,5 +1,5 @@
 import * as ipc from './ipc';
-import type { Job, Phase, Task, Dependency, NoWorkDay } from './types';
+import type { Job, Phase, Task, Dependency, NoWorkDay, Contact } from './types';
 import type { Zone } from './hit-test';
 import { UndoStack, type Snapshot as UndoSnapshot } from './undo';
 
@@ -54,6 +54,10 @@ class Store {
   todayIso = $state<string>(new Date().toISOString().slice(0, 10));
   regionDefault = $state<string>('ZA');
 
+  // Chaser
+  contacts = $state<Contact[]>([]);
+  showContactsPage = $state<boolean>(false);
+
   async toggleDurationUnit(): Promise<void> {
     this.durationUnit = this.durationUnit === 'weeks' ? 'days' : 'weeks';
     await ipc.setDurationUnit(this.durationUnit);
@@ -68,6 +72,55 @@ class Store {
     this.uiScale = value;
     document.documentElement.style.setProperty('--ui-scale', String(value));
     await ipc.setUiScale(value);
+  }
+
+  async refreshContacts(): Promise<void> {
+    this.contacts = await ipc.listContacts();
+  }
+
+  async createContact(args: { name: string; telegram_chat_id: string | null; telegram_handle: string | null; notes: string }): Promise<Contact> {
+    const created = await ipc.createContact(args);
+    await this.refreshContacts();
+    return created;
+  }
+
+  async updateContact(c: Contact): Promise<void> {
+    await ipc.updateContact({
+      id: c.id, name: c.name,
+      telegram_chat_id: c.telegram_chat_id,
+      telegram_handle: c.telegram_handle,
+      notes: c.notes,
+    });
+    await this.refreshContacts();
+  }
+
+  async deleteContact(id: number): Promise<void> {
+    await ipc.deleteContact(id);
+    await this.refreshContacts();
+    // Clear contact_id on any tasks in memory that referenced it
+    this.tasks = this.tasks.map(t => t.contact_id === id ? { ...t, contact_id: null } : t);
+  }
+
+  async assignTaskContact(task_id: number, contact_id: number | null): Promise<void> {
+    await ipc.assignTaskContact({ task_id, contact_id });
+    this.tasks = this.tasks.map(t => t.id === task_id ? { ...t, contact_id } : t);
+  }
+
+  /** Run the auto-nudge sweep — fired on launch + on focus. Surfaces results via toast. */
+  async runChaserCheck(): Promise<void> {
+    try {
+      const results = await ipc.runChaserCheck();
+      for (const r of results) {
+        if (r.success) {
+          // Best-effort toast; if Toast component isn't ready it's a no-op
+          (window as unknown as { __toast?: (msg: string) => void }).__toast?.(
+            `Pinged ${r.contact_name} about "${r.task_name}"`
+          );
+        }
+      }
+    } catch (e) {
+      console.warn('chaser check failed', e);
+    }
   }
 
   async setCurrentJobRegion(region: string): Promise<void> {
@@ -268,9 +321,22 @@ class Store {
       catch { /* job may have been deleted */ }
     }
 
+    await this.refreshContacts();
+
     // Keep today's date fresh: tick every minute, plus on window focus.
     setInterval(() => this.tickToday(), 60_000);
     window.addEventListener('focus', () => this.tickToday());
+
+    // Auto-nudges: 3s after boot, and on window focus (debounced once per 5 min).
+    setTimeout(() => this.runChaserCheck(), 3000);
+    let lastNudgeAt = 0;
+    window.addEventListener('focus', () => {
+      const now = Date.now();
+      if (now - lastNudgeAt > 5 * 60 * 1000) {
+        lastNudgeAt = now;
+        this.runChaserCheck();
+      }
+    });
   }
 
   async refreshSidebar(): Promise<void> {
