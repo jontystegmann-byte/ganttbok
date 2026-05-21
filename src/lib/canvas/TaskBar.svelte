@@ -7,30 +7,44 @@
     task: Task; phase: Phase; days: { date: string }[]; row: number;
   } = $props();
 
-  const xStart = $derived(days.findIndex(d => d.date === task.start_date) * 24);
+  import { occupiedWorkdays, groupConsecutive } from '../calendar';
+
+  const skipNoWork = $derived(store.currentJob?.holidays_block_work ?? true);
+  const noWorkSet = $derived.by(() => new Set(store.noWorkDays.map((n) => n.date)));
+
+  const occupied = $derived(occupiedWorkdays(task.start_date, task.duration_workdays, noWorkSet, skipNoWork));
+  const dayIndexOf = $derived.by(() => {
+    const m = new Map<string, number>();
+    days.forEach((d, i) => m.set(d.date, i));
+    return m;
+  });
+  const occupiedIndices = $derived(occupied.map((iso) => dayIndexOf.get(iso) ?? -1).filter((i) => i >= 0));
+  const segments = $derived(groupConsecutive(occupiedIndices));
+
+  const xStart = $derived(occupiedIndices[0] !== undefined ? occupiedIndices[0] * 24 : 0);
   const w = $derived(task.duration_workdays * 24);
   const y = $derived(row * 32 + 6);
+  const totalSpanW = $derived(
+    segments.length > 0 ? (segments[segments.length - 1].start + segments[segments.length - 1].len) * 24 - xStart : w,
+  );
   const isSelected = $derived(store.selection?.kind === 'task' && store.selection.id === task.id);
   const isDragging = $derived(store.dragState?.taskId === task.id);
 
   const livePreview = $derived.by(() => {
-    if (!isDragging || !store.dragState) return { x: xStart, w };
+    if (!isDragging || !store.dragState) return { x: xStart, w: totalSpanW };
     const d = store.dragState;
-    if (d.zone === 'move')         return { x: xStart + d.liveDelta, w };
-    if (d.zone === 'resize-end')   return { x: xStart, w: Math.max(24, w + d.liveDelta) };
-    if (d.zone === 'resize-start') return { x: xStart + d.liveDelta, w: Math.max(24, w - d.liveDelta) };
-    return { x: xStart, w };
+    if (d.zone === 'move')         return { x: xStart + d.liveDelta, w: totalSpanW };
+    if (d.zone === 'resize-end')   return { x: xStart, w: Math.max(24, totalSpanW + d.liveDelta) };
+    if (d.zone === 'resize-start') return { x: xStart + d.liveDelta, w: Math.max(24, totalSpanW - d.liveDelta) };
+    return { x: xStart, w: totalSpanW };
   });
 
   /** Visual edge width — wider than EDGE_PX hit zone so the handle is obvious. */
   const edgeW = $derived(Math.min(Math.max(livePreview.w * 0.15, EDGE_PX), 14));
 
-  function onPointerDown(e: PointerEvent) {
+  function startDrag(zone: 'move' | 'resize-start' | 'resize-end', e: PointerEvent) {
     e.stopPropagation();
     store.select({ kind: 'task', id: task.id });
-    const rect = (e.currentTarget as Element).getBoundingClientRect();
-    const relX = e.clientX - rect.left;
-    const zone = hitZone({ relX, width: w });
     store.dragState = {
       taskId: task.id,
       zone,
@@ -39,6 +53,12 @@
       originalDuration: task.duration_workdays,
       liveDelta: 0,
     };
+  }
+
+  function onBodyDown(e: PointerEvent) {
+    // Use bar-body's own rect to pick the zone (move vs edge if the body extends under handles).
+    const r = (e.currentTarget as Element).getBoundingClientRect();
+    startDrag(hitZone({ relX: e.clientX - r.left, width: r.width }), e);
   }
 
   function onDepPortDown(e: PointerEvent) {
@@ -75,18 +95,34 @@
   role="button"
   tabindex="0"
 >
-  <!-- Main bar body -->
-  <rect
-    x={livePreview.x} y={y}
-    width={livePreview.w} height={20}
-    rx={3}
-    fill={phase.colour}
-    fill-opacity={isDragging ? 0.4 : 1}
-    stroke={isSelected ? 'var(--c-accent)' : 'transparent'}
-    stroke-width="2"
-    class="bar-body zone-move"
-    onpointerdown={onPointerDown}
-  />
+  {#if isDragging}
+    <!-- Single live-preview rect during drag — segmentation hidden while moving for clarity. -->
+    <rect
+      x={livePreview.x} y={y}
+      width={livePreview.w} height={20}
+      rx={3}
+      fill={phase.colour}
+      fill-opacity={0.4}
+      stroke={isSelected ? 'var(--c-accent)' : 'transparent'}
+      stroke-width="2"
+      class="bar-body zone-move"
+      onpointerdown={onBodyDown}
+    />
+  {:else}
+    {#each segments as seg, si}
+      <rect
+        x={seg.start * 24} y={y}
+        width={seg.len * 24} height={20}
+        rx={3}
+        fill={phase.colour}
+        fill-opacity={1}
+        stroke={isSelected && si === 0 ? 'var(--c-accent)' : 'transparent'}
+        stroke-width="2"
+        class="bar-body zone-move"
+        onpointerdown={onBodyDown}
+      />
+    {/each}
+  {/if}
 
   <!-- Resize edge zones: visible tinted overlays so handles are obvious -->
   <rect
@@ -95,7 +131,7 @@
     rx={3}
     class="edge-handle zone-resize-start"
     class:visible={store.hoveredTaskId === task.id || isSelected}
-    onpointerdown={onPointerDown}
+    onpointerdown={(e) => startDrag('resize-start', e)}
   />
   <rect
     x={livePreview.x + livePreview.w - edgeW} y={y}
@@ -103,7 +139,17 @@
     rx={3}
     class="edge-handle zone-resize-end"
     class:visible={store.hoveredTaskId === task.id || isSelected}
-    onpointerdown={onPointerDown}
+    onpointerdown={(e) => startDrag('resize-end', e)}
+  />
+
+  <!-- Invisible hover-extension rect: covers gap to the dep port so port stays visible across the gap. -->
+  <rect
+    x={livePreview.x + livePreview.w}
+    y={y - 4}
+    width={DEP_OFFSET + DEP_R * 2 + 4}
+    height={28}
+    fill="transparent"
+    pointer-events="all"
   />
 
   {#if livePreview.w > 60}

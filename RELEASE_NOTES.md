@@ -1,15 +1,10 @@
-Gantt Bok v1.1.0 — features, polish, bug fixes
-
-NEW
-- Solid vertical lines at every week boundary, running the full height of the chart.
-- Click any duration tag (e.g. "2.3w") to flip every tag between weeks and days. Setting is remembered next time you open the app.
-- Each job now has a "SA public holidays count as no-work days" toggle in the right-hand panel. Switch it off and bars will run through holidays instead of stepping around them. New jobs default to whatever you used last.
-- Dependency creation gesture redesigned. Resize handles at the bar's left and right edges are now wider and faintly tinted so you can see them. The dependency-creation port is now a separate filled circle that floats 10 px outside the right edge with a clear connector — no more accidental drags between resize and dependency.
+Gantt Bok v1.1.1 — drag, dependency, holiday & settings fixes
 
 FIXED
-- Print now actually works. Cmd+P → Print → Print → the macOS print dialog opens (save-as-PDF or send to printer). Previous build silently failed.
-- Row alignment between the task list and the chart canvas. Phase + task rows now line up perfectly all the way down, including when phases have many tasks.
+- Right-edge resize now actually grows the bar to the right. Previously the right handle was rerouting to the left edge and shifting the start instead.
+- The dependency-creation circle no longer disappears when your mouse crosses the gap from the bar end to the port. Hover zone now bridges across.
+- Bars physically split around public holidays now. When the holiday toggle is on, the bar breaks visually at each public holiday and the task automatically extends one extra day to compensate.
+- Phase bars are more robust to tasks whose start dates fall before the project's stated start (the viewport now expands leftward so they're visible).
 
-UNDER THE HOOD
-- Native Apple Silicon build (no more Rosetta).
-- All future updates land in-app — version badge in the bottom-left becomes "Update to v1.1.X →" when a new release is published.
+CHANGED
+- Job-level settings (public-holiday split toggle) moved out of the right-hand panel and into a small ⚙ gear icon at the bottom-left. The right-hand panel now goes back to showing only when you select a task or phase. Duration unit (weeks/days) also lives in the new settings popover.

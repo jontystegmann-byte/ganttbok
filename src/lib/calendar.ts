@@ -55,8 +55,62 @@ export function addWorkdays(iso: string, n: number): string {
   return fmt(d);
 }
 
+/**
+ * Compute the actual workdays a task occupies, optionally skipping no-work days.
+ * Returns an array of ISO date strings of length `durationWorkdays`.
+ * If `skipNoWork=true`, holidays/manual no-work days are stepped over (and the task extends further into the future).
+ */
+export function occupiedWorkdays(
+  startDate: string,
+  durationWorkdays: number,
+  noWorkSet: Set<string>,
+  skipNoWork: boolean,
+): string[] {
+  const out: string[] = [];
+  const d = parse(startDate);
+  // Snap forward to the next valid workday if we landed on a weekend or no-work day.
+  while (!isWorkday(d) || (skipNoWork && noWorkSet.has(fmt(d)))) {
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+  while (out.length < durationWorkdays) {
+    const iso = fmt(d);
+    if (isWorkday(d) && (!skipNoWork || !noWorkSet.has(iso))) {
+      out.push(iso);
+    }
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+  return out;
+}
+
+/** Group consecutive viewport indices into runs: e.g. [0,1,2,5,6] → [{start:0,len:3},{start:5,len:2}]. */
+export function groupConsecutive(indices: number[]): { start: number; len: number }[] {
+  if (indices.length === 0) return [];
+  const sorted = [...indices].sort((a, b) => a - b);
+  const runs: { start: number; len: number }[] = [];
+  let runStart = sorted[0];
+  let runLen = 1;
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i] === sorted[i - 1] + 1) {
+      runLen++;
+    } else {
+      runs.push({ start: runStart, len: runLen });
+      runStart = sorted[i];
+      runLen = 1;
+    }
+  }
+  runs.push({ start: runStart, len: runLen });
+  return runs;
+}
+
 export function computeViewportDays(projectStart: string, tasks: Task[]): ViewportDay[] {
-  const start = mondayOfWeek(parse(projectStart));
+  // Start at the earliest of (project_start, any task's start_date) so tasks dragged
+  // before the project_start_date are still visible in the viewport.
+  let earliestStart = parse(projectStart);
+  for (const t of tasks) {
+    const ts = parse(t.start_date);
+    if (ts < earliestStart) earliestStart = ts;
+  }
+  const start = mondayOfWeek(earliestStart);
 
   // Compute the latest end so the viewport is wide enough.
   let latestEnd = parse(projectStart);
