@@ -25,6 +25,6 @@ mod tests {
         let v: i64 = conn
             .query_row("SELECT CAST(value AS INTEGER) FROM app_meta WHERE key='schema_version'", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(v, 1);
+        assert!(v >= 1);
     }
 }

@@ -15,7 +15,7 @@ fn full_job_lifecycle_with_template_drag_and_sa_sync() {
     let tmpl = job::create(&conn, &NewJob {
         name: "Std reno".into(), client: None, address: None,
         project_start_date: NaiveDate::from_ymd_opt(2026,1,1).unwrap(),
-        is_template: true,
+        is_template: true, holidays_block_work: true,
     }).unwrap();
     let p1 = phase::create(&conn, &NewPhase {
         job_id: tmpl.id, name: "Plumbing".into(), colour: "#3B82F6".into(),
@@ -45,7 +45,7 @@ fn full_job_lifecycle_with_template_drag_and_sa_sync() {
     let project_start = NaiveDate::from_ymd_opt(2026, 6, 8).unwrap();
     let new_job = job::create(&conn, &NewJob {
         name: "Sea Point".into(), client: Some("M. Botha".into()), address: None,
-        project_start_date: project_start, is_template: false,
+        project_start_date: project_start, is_template: false, holidays_block_work: true,
     }).unwrap();
     for p in phase::list_for_job(&conn, tmpl.id).unwrap() {
         let np = phase::create(&conn, &NewPhase {

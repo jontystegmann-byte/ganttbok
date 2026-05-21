@@ -11,11 +11,11 @@
     await ipc.updatePhase($state.snapshot(phase));
   }
 
-  /** Format workdays as a weeks string with 1 decimal place ("0.6w", "1w", "2.4w"). */
-  function fmtWeeks(workdays: number): string {
+  /** Format workdays per current user-pref: "2.4w" or "12d". */
+  function fmtDuration(workdays: number): string {
     if (workdays <= 0) return '';
+    if (store.durationUnit === 'days') return `${workdays}d`;
     const weeks = workdays / 5;
-    // Strip trailing .0 so whole weeks read clean.
     const rounded = Math.round(weeks * 10) / 10;
     return rounded === Math.floor(rounded) ? `${rounded}w` : `${rounded.toFixed(1)}w`;
   }
@@ -63,7 +63,7 @@
       </button>
       <span class="num">{pi + 1}.</span>
       <span class="name" onclick={() => store.select({ kind: 'phase', id: phase.id })} role="button" tabindex="0">{phase.name}</span>
-      <span class="weeks">{fmtWeeks(phaseWorkdays(store.tasksByPhase.get(phase.id) ?? []))}</span>
+      <span class="weeks" role="button" tabindex="0" title="Click to toggle weeks/days" onclick={(e) => { e.stopPropagation(); store.toggleDurationUnit(); }}>{fmtDuration(phaseWorkdays(store.tasksByPhase.get(phase.id) ?? []))}</span>
     </div>
     {#if !phase.collapsed}
       {@const phaseTasks = store.tasksByPhase.get(phase.id) ?? []}
@@ -88,7 +88,7 @@
         >
           <span class="num">{pi + 1}.{ti + 1}</span>
           <span class="name" onclick={() => store.select({ kind: 'task', id: task.id })} role="button" tabindex="0">{task.name}</span>
-          <span class="weeks">{fmtWeeks(task.duration_workdays)}</span>
+          <span class="weeks" role="button" tabindex="0" title="Click to toggle weeks/days" onclick={(e) => { e.stopPropagation(); store.toggleDurationUnit(); }}>{fmtDuration(task.duration_workdays)}</span>
         </div>
       {/each}
       <button class="add-task" onclick={async () => {
@@ -114,6 +114,7 @@
     padding: 0 var(--sp-2);
     border-bottom: 1px solid var(--c-border);
     font-size: var(--font-size-sm);
+    box-sizing: border-box;
   }
   .task-row { padding-left: calc(var(--sp-2) * 4); color: var(--c-text-muted); }
   .chev {
@@ -128,12 +129,20 @@
     color: var(--c-text-muted);
     opacity: 0.6;
     font-size: var(--font-size-xs);
-    padding-right: var(--sp-1);
+    padding: 1px var(--sp-1);
     flex-shrink: 0;
+    cursor: pointer;
+    border-radius: 3px;
   }
+  .weeks:hover { opacity: 1; background: var(--c-accent-fade); color: var(--c-accent); }
   .add-task, .add-phase {
-    width: 100%; text-align: left; padding: var(--sp-2) var(--sp-3);
-    background: transparent; border: none; cursor: pointer;
+    width: 100%; text-align: left;
+    height: var(--row-height);
+    padding: 0 var(--sp-3);
+    box-sizing: border-box;
+    background: transparent; border: none;
+    border-bottom: 1px solid var(--c-border);
+    cursor: pointer;
     color: var(--c-text-muted); font-size: var(--font-size-sm);
   }
   .add-task:hover, .add-phase:hover { background: var(--c-accent-fade); color: var(--c-accent); }

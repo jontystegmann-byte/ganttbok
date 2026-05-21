@@ -1,18 +1,23 @@
 <script lang="ts">
+  import { invoke } from '@tauri-apps/api/core';
   import { store } from '../store.svelte';
 
   function cancel() { store.showPrintOptions = false; }
 
-  function print() {
+  async function print() {
     document.body.classList.add('print-scaling-' + store.printScaling);
     if (store.printShowNotes) document.body.classList.add('print-with-notes');
     store.showPrintOptions = false;
-    setTimeout(() => {
+    await new Promise((r) => setTimeout(r, 80));
+    try {
+      await invoke('print_window');
+    } catch (e) {
+      console.error('print failed', e);
       window.print();
-      setTimeout(() => {
-        document.body.classList.remove('print-scaling-fit', 'print-scaling-multi', 'print-with-notes');
-      }, 1000);
-    }, 50);
+    }
+    setTimeout(() => {
+      document.body.classList.remove('print-scaling-fit', 'print-scaling-multi', 'print-with-notes');
+    }, 1500);
   }
 </script>
 

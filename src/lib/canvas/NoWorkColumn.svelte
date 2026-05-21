@@ -5,7 +5,11 @@
 
   const noWorkByDate = $derived.by(() => {
     const m = new Map<string, string>();
-    for (const n of store.noWorkDays) m.set(n.date, n.reason);
+    const allowHolidays = store.currentJob?.holidays_block_work ?? true;
+    for (const n of store.noWorkDays) {
+      if (!allowHolidays && n.source === 'sa_public_holiday') continue;
+      m.set(n.date, n.reason);
+    }
     return m;
   });
 </script>

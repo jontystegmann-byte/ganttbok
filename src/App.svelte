@@ -49,7 +49,7 @@
     {/if}
   </main>
 
-  {#if store.selection}
+  {#if store.selection || store.currentJob}
     <aside class="details">
       <DetailsPanel />
     </aside>

@@ -56,6 +56,8 @@ export const markCleanShutdown  = ()                                 => invoke<v
 export const setLastOpenJob     = (jobId: number)                    => invoke<void>('set_last_open_job', { jobId });
 export const setSidebarWidth    = (width: number)                    => invoke<void>('set_sidebar_width', { width });
 export const touchLastSave      = ()                                 => invoke<void>('touch_last_save');
+export const setDurationUnit    = (unit: 'weeks' | 'days')           => invoke<void>('set_duration_unit', { unit });
+export const setHolidaysBlockWorkDefault = (value: boolean)          => invoke<void>('set_holidays_block_work_default', { value });
 
 // Resync (used by undo/redo + manual ⌘S to push local state to backend in one transaction)
 export interface ResyncArgs {

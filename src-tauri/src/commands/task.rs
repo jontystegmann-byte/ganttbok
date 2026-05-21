@@ -66,6 +66,7 @@ mod tests {
             name: "J".into(), client: None, address: None,
             project_start_date: NaiveDate::from_ymd_opt(2026,6,5).unwrap(),
             is_template: false,
+            holidays_block_work: true,
         }).unwrap();
         let p = phase::create(&conn, &NewPhase {
             job_id: j.id, name: "P".into(), colour: "#000".into(),

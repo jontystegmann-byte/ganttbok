@@ -6,7 +6,7 @@ use crate::commands::Db;
 use crate::calendar::workday::count_workdays;
 use crate::db::models::{Dependency, Task};
 use crate::deps::ripple::compute_ripple;
-use crate::repo::{dependency as dep_repo, no_work_day as nwd_repo, task as task_repo};
+use crate::repo::{dependency as dep_repo, job as job_repo, no_work_day as nwd_repo, task as task_repo};
 use crate::{GbError, GbResult};
 
 #[derive(Debug, Deserialize)]
@@ -30,8 +30,12 @@ pub fn drag_task(db: State<Db>, args: DragTaskArgs) -> GbResult<DragResult> {
 fn drag_task_inner(conn: &rusqlite::Connection, args: DragTaskArgs) -> GbResult<DragResult> {
     let tasks: Vec<Task> = task_repo::list_for_job(conn, args.job_id)?;
     let deps: Vec<Dependency> = dep_repo::list_for_job(conn, args.job_id)?;
+    let job = job_repo::get(conn, args.job_id)?;
     let nwds: HashSet<NaiveDate> = nwd_repo::list_for_job(conn, args.job_id)?
-        .into_iter().map(|n| n.date).collect();
+        .into_iter()
+        .filter(|n| job.holidays_block_work || n.source != "sa_public_holiday")
+        .map(|n| n.date)
+        .collect();
 
     let dragged = tasks.iter().find(|t| t.id == args.task_id)
         .ok_or_else(|| GbError::NotFound(format!("task {}", args.task_id)))?;
@@ -78,6 +82,7 @@ mod tests {
             name: "J".into(), client: None, address: None,
             project_start_date: NaiveDate::from_ymd_opt(2026,6,5).unwrap(),
             is_template: false,
+            holidays_block_work: true,
         }).unwrap();
         let p = phase::create(&conn, &NewPhase {
             job_id: j.id, name: "P".into(), colour: "#000".into(),

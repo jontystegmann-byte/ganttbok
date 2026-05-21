@@ -45,6 +45,15 @@ class Store {
   printScaling     = $state<'fit' | 'multi'>('fit');
   printShowNotes   = $state<boolean>(false);
 
+  // User prefs
+  durationUnit = $state<'weeks' | 'days'>('weeks');
+  holidaysBlockWorkDefault = $state<boolean>(true);
+
+  async toggleDurationUnit(): Promise<void> {
+    this.durationUnit = this.durationUnit === 'weeks' ? 'days' : 'weeks';
+    await ipc.setDurationUnit(this.durationUnit);
+  }
+
   // Dep creation gesture
   depCreator = $state<{
     fromTaskId: number;
@@ -124,11 +133,19 @@ class Store {
   }
 
   async createJob(args: { name: string; client: string | null; address: string | null; project_start_date: string; }): Promise<void> {
-    const job = await ipc.createJob({ ...args, is_template: false });
+    const job = await ipc.createJob({ ...args, is_template: false, holidays_block_work: this.holidaysBlockWorkDefault });
     await this.refreshSidebar();
     await this.openJob(job.id);
     await ipc.touchLastSave();
     this.showNewJobModal = false;
+  }
+
+  async setJobHolidaysBlockWork(value: boolean): Promise<void> {
+    if (!this.currentJob) return;
+    this.currentJob.holidays_block_work = value;
+    await ipc.updateJob($state.snapshot(this.currentJob));
+    this.holidaysBlockWorkDefault = value;
+    await ipc.setHolidaysBlockWorkDefault(value);
   }
 
   async createFromTemplate(
@@ -158,6 +175,8 @@ class Store {
   async bootstrap(): Promise<void> {
     const meta = await ipc.startupInfo();
     if (meta.sidebar_width) this.sidebarWidth = meta.sidebar_width;
+    if (meta.duration_unit === 'days' || meta.duration_unit === 'weeks') this.durationUnit = meta.duration_unit;
+    if (meta.holidays_block_work_default !== null) this.holidaysBlockWorkDefault = meta.holidays_block_work_default;
     await this.refreshSidebar();
     await this.refreshArchived();
     if (meta.last_open_job_id) {

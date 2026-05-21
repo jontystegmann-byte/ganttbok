@@ -68,6 +68,9 @@ pub fn run() {
             commands::meta::set_last_open_job,
             commands::meta::set_sidebar_width,
             commands::meta::touch_last_save,
+            commands::meta::print_window,
+            commands::meta::set_duration_unit,
+            commands::meta::set_holidays_block_work_default,
             commands::sync::resync_job_state,
         ])
         .on_window_event(|window, event| {

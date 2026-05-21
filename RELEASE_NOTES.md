@@ -1,12 +1,15 @@
-Gantt Bok v1.0.1 — auto-updates land
+Gantt Bok v1.1.0 — features, polish, bug fixes
 
-This is the first build with in-app auto-updates. From here on, future versions install themselves — you'll see "Update to v1.0.2 →" in the bottom-left corner whenever a new release lands. Click it and the app updates and restarts. Your jobs and data are preserved.
+NEW
+- Solid vertical lines at every week boundary, running the full height of the chart.
+- Click any duration tag (e.g. "2.3w") to flip every tag between weeks and days. Setting is remembered next time you open the app.
+- Each job now has a "SA public holidays count as no-work days" toggle in the right-hand panel. Switch it off and bars will run through holidays instead of stepping around them. New jobs default to whatever you used last.
+- Dependency creation gesture redesigned. Resize handles at the bar's left and right edges are now wider and faintly tinted so you can see them. The dependency-creation port is now a separate filled circle that floats 10 px outside the right edge with a clear connector — no more accidental drags between resize and dependency.
 
-This v1.0.1 install itself still has to be dragged into Applications one last time. After that, you're done with manual installs.
+FIXED
+- Print now actually works. Cmd+P → Print → Print → the macOS print dialog opens (save-as-PDF or send to printer). Previous build silently failed.
+- Row alignment between the task list and the chart canvas. Phase + task rows now line up perfectly all the way down, including when phases have many tasks.
 
-Native Apple Silicon build now included — runs at full speed without Rosetta.
-
-Bug fixes:
-- Negative drag (dragging tasks earlier in time) now respects workdays correctly
-- PhaseDetails colour picker updates instantly instead of waiting for blur
-- Various small layout fixes
+UNDER THE HOOD
+- Native Apple Silicon build (no more Rosetta).
+- All future updates land in-app — version badge in the bottom-left becomes "Update to v1.1.X →" when a new release is published.

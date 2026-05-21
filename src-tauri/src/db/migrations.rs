@@ -61,6 +61,8 @@ const MIGRATIONS: &[&str] = &[
         UNIQUE(job_id, date)
     );
     "#,
+    // v2 — per-job holiday-split toggle. 1 = SA holidays split bars (current default).
+    "ALTER TABLE job ADD COLUMN holidays_block_work INTEGER NOT NULL DEFAULT 1;",
 ];
 
 pub fn apply_migrations(conn: &Connection) -> GbResult<()> {
@@ -100,7 +102,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn fresh_db_reports_schema_version_zero_then_one_after_migrations() {
+    fn fresh_db_reports_latest_schema_version_after_migrations() {
         let conn = Connection::open_in_memory().unwrap();
         apply_migrations(&conn).unwrap();
         let v: i64 = conn
@@ -110,7 +112,7 @@ mod tests {
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!(v, 1);
+        assert_eq!(v, MIGRATIONS.len() as i64);
     }
 
     #[test]
@@ -121,7 +123,7 @@ mod tests {
         let v: i64 = conn
             .query_row("SELECT CAST(value AS INTEGER) FROM app_meta WHERE key='schema_version'", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(v, 1);
+        assert_eq!(v, MIGRATIONS.len() as i64);
     }
 
     #[test]

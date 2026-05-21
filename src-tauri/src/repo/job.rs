@@ -5,25 +5,27 @@ use crate::{GbError, GbResult};
 
 pub fn create(conn: &Connection, new: &NewJob) -> GbResult<Job> {
     conn.execute(
-        "INSERT INTO job (name, client, address, project_start_date, is_template)
-         VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT INTO job (name, client, address, project_start_date, is_template, holidays_block_work)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         params![
             new.name,
             new.client,
             new.address,
             new.project_start_date.to_string(),
             new.is_template as i64,
+            new.holidays_block_work as i64,
         ],
     )?;
     let id = conn.last_insert_rowid();
     get(conn, id)
 }
 
+const SELECT_COLS: &str = "id, name, client, address, project_start_date, \
+    is_template, archived, created_at, holidays_block_work";
+
 pub fn get(conn: &Connection, id: i64) -> GbResult<Job> {
     conn.query_row(
-        "SELECT id, name, client, address, project_start_date,
-                is_template, archived, created_at
-         FROM job WHERE id = ?1",
+        &format!("SELECT {SELECT_COLS} FROM job WHERE id = ?1"),
         [id],
         row_to_job,
     )
@@ -35,11 +37,9 @@ pub fn get(conn: &Connection, id: i64) -> GbResult<Job> {
 
 pub fn list_active(conn: &Connection) -> GbResult<Vec<Job>> {
     let mut stmt = conn.prepare(
-        "SELECT id, name, client, address, project_start_date,
-                is_template, archived, created_at
-         FROM job
-         WHERE archived = 0 AND is_template = 0
-         ORDER BY created_at DESC",
+        &format!("SELECT {SELECT_COLS} FROM job \
+                  WHERE archived = 0 AND is_template = 0 \
+                  ORDER BY created_at DESC"),
     )?;
     let rows = stmt.query_map([], row_to_job)?;
     let mut out = Vec::new();
@@ -49,11 +49,9 @@ pub fn list_active(conn: &Connection) -> GbResult<Vec<Job>> {
 
 pub fn list_archived(conn: &Connection) -> GbResult<Vec<Job>> {
     let mut stmt = conn.prepare(
-        "SELECT id, name, client, address, project_start_date,
-                is_template, archived, created_at
-         FROM job
-         WHERE archived = 1 AND is_template = 0
-         ORDER BY created_at DESC",
+        &format!("SELECT {SELECT_COLS} FROM job \
+                  WHERE archived = 1 AND is_template = 0 \
+                  ORDER BY created_at DESC"),
     )?;
     let rows = stmt.query_map([], row_to_job)?;
     let mut out = Vec::new();
@@ -63,11 +61,9 @@ pub fn list_archived(conn: &Connection) -> GbResult<Vec<Job>> {
 
 pub fn list_templates(conn: &Connection) -> GbResult<Vec<Job>> {
     let mut stmt = conn.prepare(
-        "SELECT id, name, client, address, project_start_date,
-                is_template, archived, created_at
-         FROM job
-         WHERE is_template = 1
-         ORDER BY name",
+        &format!("SELECT {SELECT_COLS} FROM job \
+                  WHERE is_template = 1 \
+                  ORDER BY name"),
     )?;
     let rows = stmt.query_map([], row_to_job)?;
     let mut out = Vec::new();
@@ -78,13 +74,15 @@ pub fn list_templates(conn: &Connection) -> GbResult<Vec<Job>> {
 pub fn update(conn: &Connection, job: &Job) -> GbResult<()> {
     let n = conn.execute(
         "UPDATE job SET name = ?1, client = ?2, address = ?3,
-                        project_start_date = ?4, is_template = ?5, archived = ?6
-         WHERE id = ?7",
+                        project_start_date = ?4, is_template = ?5, archived = ?6,
+                        holidays_block_work = ?7
+         WHERE id = ?8",
         params![
             job.name, job.client, job.address,
             job.project_start_date.to_string(),
             job.is_template as i64,
             job.archived as i64,
+            job.holidays_block_work as i64,
             job.id,
         ],
     )?;
@@ -117,6 +115,7 @@ fn row_to_job(r: &rusqlite::Row) -> rusqlite::Result<Job> {
         is_template: r.get::<_, i64>(5)? != 0,
         archived: r.get::<_, i64>(6)? != 0,
         created_at: r.get(7)?,
+        holidays_block_work: r.get::<_, i64>(8)? != 0,
     })
 }
 
@@ -132,6 +131,7 @@ mod tests {
             address: None,
             project_start_date: NaiveDate::from_ymd_opt(2026, 6, 5).unwrap(),
             is_template: false,
+            holidays_block_work: true,
         }
     }
 
@@ -143,6 +143,7 @@ mod tests {
         assert_eq!(job.name, "Sea Point");
         let fetched = get(&conn, job.id).unwrap();
         assert_eq!(fetched.name, "Sea Point");
+        assert!(fetched.holidays_block_work);
     }
 
     #[test]
@@ -172,8 +173,11 @@ mod tests {
         let conn = open_in_memory().unwrap();
         let mut job = create(&conn, &sample("Old")).unwrap();
         job.name = "New".into();
+        job.holidays_block_work = false;
         update(&conn, &job).unwrap();
-        assert_eq!(get(&conn, job.id).unwrap().name, "New");
+        let fetched = get(&conn, job.id).unwrap();
+        assert_eq!(fetched.name, "New");
+        assert!(!fetched.holidays_block_work);
     }
 
     #[test]

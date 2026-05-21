@@ -62,6 +62,7 @@ mod tests {
             name: "J".into(), client: None, address: None,
             project_start_date: NaiveDate::from_ymd_opt(2026,6,5).unwrap(),
             is_template: false,
+            holidays_block_work: true,
         }).unwrap();
         let existing = phase_repo::list_for_job(&conn, j.id).unwrap();
         let next = existing.iter().map(|p| p.order_index).max().unwrap_or(-1) + 1;

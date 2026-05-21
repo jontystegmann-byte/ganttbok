@@ -92,6 +92,7 @@ mod tests {
             name: "J".into(), client: None, address: None,
             project_start_date: NaiveDate::from_ymd_opt(2026,1,1).unwrap(),
             is_template: false,
+            holidays_block_work: true,
         }).unwrap();
         let n = sync_sa_holidays(
             &conn, j.id,
@@ -108,6 +109,7 @@ mod tests {
             name: "J".into(), client: None, address: None,
             project_start_date: NaiveDate::from_ymd_opt(2026,1,1).unwrap(),
             is_template: false,
+            holidays_block_work: true,
         }).unwrap();
         create(&conn, &NewNoWorkDay {
             job_id: j.id,

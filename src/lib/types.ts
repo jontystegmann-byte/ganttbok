@@ -11,6 +11,7 @@ export interface Job {
   is_template: boolean;
   archived: boolean;
   created_at: string;
+  holidays_block_work: boolean;
 }
 
 export interface Phase {
@@ -53,6 +54,8 @@ export interface StartupInfo {
   last_open_job_id: number | null;
   last_save_at: string | null;
   sidebar_width: number | null;
+  duration_unit: 'weeks' | 'days' | null;
+  holidays_block_work_default: boolean | null;
 }
 
 export interface DragResult {
@@ -66,6 +69,7 @@ export interface CreateJobArgs {
   address: string | null;
   project_start_date: string;
   is_template: boolean;
+  holidays_block_work: boolean;
 }
 
 export interface CreatePhaseArgs {

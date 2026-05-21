@@ -11,6 +11,7 @@ pub struct Job {
     pub is_template: bool,
     pub archived: bool,
     pub created_at: String,
+    pub holidays_block_work: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,6 +21,7 @@ pub struct NewJob {
     pub address: Option<String>,
     pub project_start_date: NaiveDate,
     pub is_template: bool,
+    pub holidays_block_work: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -129,6 +131,7 @@ mod tests {
             is_template: false,
             archived: false,
             created_at: "2026-05-19T20:00:00".into(),
+            holidays_block_work: true,
         };
         let s = serde_json::to_string(&job).unwrap();
         let back: Job = serde_json::from_str(&s).unwrap();
