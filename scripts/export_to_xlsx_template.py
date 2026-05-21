@@ -141,14 +141,29 @@ def shift_template_dates(ws, new_cal_start, col_offset, max_col):
                 ws.cell(1, col).value = f"Week {r3.date().isocalendar().week}"
 
 
-def wipe_project_rows(ws, first_row, max_col):
-    """Clear values from first_row downward. Keeps cell formatting (weekend shading)."""
+def wipe_project_rows(ws, first_row, max_col, weekday_fill, weekend_fill, col_offset):
+    """Clear values AND reset fills to template defaults from first_row downward.
+    Weekday columns get the empty/no-fill style; Sat/Sun columns get the gray shade.
+    This ensures old phase-title rows (which had a blue tint across the whole row)
+    revert to a clean grid before we re-apply the blue fill to OUR phase rows.
+    """
     for r in range(first_row, ws.max_row + 1):
         for c in range(1, max_col + 1):
-            ws.cell(r, c).value = None
+            cell = ws.cell(r, c)
+            cell.value = None
+            if c < col_offset:
+                # Cols A/B/C — narrow label cols, always clear
+                cell.fill = copy(weekday_fill)
+            else:
+                # Determine weekday from row 3 (post-shift) for this column
+                day_cell = ws.cell(3, c).value
+                if isinstance(day_cell, datetime) and day_cell.weekday() >= 5:
+                    cell.fill = copy(weekend_fill)
+                else:
+                    cell.fill = copy(weekday_fill)
 
 
-def write_job(ws, job, phases, tasks_by_phase, no_work, col_offset, max_col, first_row, new_cal_start):
+def write_job(ws, job, phases, tasks_by_phase, no_work, col_offset, max_col, first_row, new_cal_start, phase_header_fill=None, phase_header_font=None):
     def col_for(d):
         return col_offset + (d - new_cal_start).days
 
@@ -161,8 +176,13 @@ def write_job(ws, job, phases, tasks_by_phase, no_work, col_offset, max_col, fir
     for p in phases:
         if not tasks_by_phase[p["id"]]:
             continue
-        ws.cell(row, 2).value = p["name"]
-        ws.cell(row, 2).font = Font(bold=True, size=10)
+        # Phase header is a banner row: fill the whole row in the template's blue tint.
+        if phase_header_fill is not None:
+            for c in range(1, max_col + 1):
+                ws.cell(row, c).fill = copy(phase_header_fill)
+        phase_cell = ws.cell(row, 2)
+        phase_cell.value = p["name"]
+        phase_cell.font = copy(phase_header_font) if phase_header_font is not None else Font(bold=True, size=10)
         row += 1
         colour_hex = p["colour"].lstrip("#")
         for t in tasks_by_phase[p["id"]]:
@@ -207,16 +227,30 @@ def main():
     ws = wb.active
     max_col = ws.max_column
 
+    # Capture the template's reference styles BEFORE wiping anything.
+    # - Phase header: B7 ("Coffee shop") — full-row blue tint
+    # - Weekday default: E8 (task row, Tue) — no fill
+    # - Weekend default: I8 (task row, Sat) — gray shade
+    phase_header_fill = copy(ws["B7"].fill)
+    phase_header_font = copy(ws["B7"].font)
+    weekday_default_fill = copy(ws["E8"].fill)
+    weekend_default_fill = copy(ws["I8"].fill)
+
     proj_start = datetime.strptime(job["project_start_date"], "%Y-%m-%d").date()
     new_cal_start = proj_start - timedelta(days=proj_start.weekday())
     print(f"Project start {proj_start} -> calendar starts {new_cal_start}")
 
     shift_template_dates(ws, new_cal_start, DEFAULTS["col_offset"], max_col)
-    wipe_project_rows(ws, DEFAULTS["first_project_row"], max_col)
+    wipe_project_rows(
+        ws, DEFAULTS["first_project_row"], max_col,
+        weekday_default_fill, weekend_default_fill, DEFAULTS["col_offset"],
+    )
     bars, end_row = write_job(
         ws, job, phases, tasks_by_phase, no_work,
         DEFAULTS["col_offset"], max_col,
         DEFAULTS["first_project_row"], new_cal_start,
+        phase_header_fill=phase_header_fill,
+        phase_header_font=phase_header_font,
     )
     wb.save(args.output)
     print(f"OK — {bars} bars, ends at row {end_row}, saved to {args.output}")
