@@ -157,6 +157,42 @@ pub fn reject_patch(db: State<Db>, id: String) -> GbResult<()> {
     reject_patch_inner(&conn, id)
 }
 
+pub fn clear_resolved_patches_inner(conn: &Connection) -> GbResult<u32> {
+    use chrono::Utc;
+    // "Applied older than 7 days" + "rejected/expired/apply_failed at any age".
+    let cutoff = Utc::now().timestamp() - 7 * 24 * 3600;
+    let n = conn.execute(
+        "DELETE FROM pending_patches WHERE
+             (status = 'applied' AND resolved_at < ?1)
+          OR status IN ('rejected', 'expired', 'apply_failed')",
+        params![cutoff],
+    )?;
+    Ok(n as u32)
+}
+
+pub fn expire_stale_patches_inner(conn: &Connection) -> GbResult<u32> {
+    use chrono::Utc;
+    let cutoff = Utc::now().timestamp() - 30 * 24 * 3600;
+    let n = conn.execute(
+        "UPDATE pending_patches SET status = 'expired'
+         WHERE status = 'proposed' AND created_at < ?1",
+        params![cutoff],
+    )?;
+    Ok(n as u32)
+}
+
+#[tauri::command]
+pub fn clear_resolved_patches(db: State<Db>) -> GbResult<u32> {
+    let conn = db.0.lock().unwrap();
+    clear_resolved_patches_inner(&conn)
+}
+
+#[tauri::command]
+pub fn expire_stale_patches(db: State<Db>) -> GbResult<u32> {
+    let conn = db.0.lock().unwrap();
+    expire_stale_patches_inner(&conn)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,6 +270,74 @@ mod tests {
             [], |r| r.get(0),
         ).unwrap();
         assert_eq!(status, "rejected");
+    }
+
+    #[test]
+    fn clear_resolved_removes_old_resolved_rows() {
+        let conn = open_in_memory().unwrap();
+        let (job_id, _) = fixture(&conn);
+
+        // Insert rows in various terminal states with old resolved_at.
+        let old_ts = 0i64; // epoch — definitely older than 7 days
+        for (id, status) in &[
+            ("r1", "applied"),
+            ("r2", "rejected"),
+            ("r3", "apply_failed"),
+            ("r4", "expired"),
+        ] {
+            conn.execute(
+                "INSERT INTO pending_patches (id, job_id, patch_json, summary, status, created_at, resolved_at)
+                 VALUES (?1, ?2, '{}', 's', ?3, 0, ?4)",
+                rusqlite::params![id, job_id, status, old_ts],
+            ).unwrap();
+        }
+        // One proposed row — must NOT be cleared.
+        insert_patch(&conn, "keep", job_id, "proposed");
+
+        let count = clear_resolved_patches_inner(&conn).unwrap();
+        assert_eq!(count, 4);
+
+        let remaining: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM pending_patches", [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(remaining, 1); // only "keep"
+    }
+
+    #[test]
+    fn expire_stale_marks_old_proposed_rows_expired() {
+        let conn = open_in_memory().unwrap();
+        let (job_id, _) = fixture(&conn);
+
+        // Old row: created 31 days ago.
+        let old_ts = chrono::Utc::now().timestamp() - 31 * 24 * 3600;
+        conn.execute(
+            "INSERT INTO pending_patches (id, job_id, patch_json, summary, status, created_at)
+             VALUES ('old', ?1, '{}', 'old', 'proposed', ?2)",
+            rusqlite::params![job_id, old_ts],
+        ).unwrap();
+
+        // Recent row: 1 day old.
+        let new_ts = chrono::Utc::now().timestamp() - 1 * 24 * 3600;
+        conn.execute(
+            "INSERT INTO pending_patches (id, job_id, patch_json, summary, status, created_at)
+             VALUES ('new', ?1, '{}', 'new', 'proposed', ?2)",
+            rusqlite::params![job_id, new_ts],
+        ).unwrap();
+
+        let count = expire_stale_patches_inner(&conn).unwrap();
+        assert_eq!(count, 1);
+
+        let old_status: String = conn.query_row(
+            "SELECT status FROM pending_patches WHERE id = 'old'",
+            [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(old_status, "expired");
+
+        let new_status: String = conn.query_row(
+            "SELECT status FROM pending_patches WHERE id = 'new'",
+            [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(new_status, "proposed");
     }
 
     #[test]
