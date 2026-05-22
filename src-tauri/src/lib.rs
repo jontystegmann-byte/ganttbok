@@ -4,6 +4,7 @@ pub mod commands;
 pub mod db;
 pub mod deps;
 pub mod error;
+pub mod patches;
 pub mod repo;
 
 pub use error::{GbError, GbResult};
