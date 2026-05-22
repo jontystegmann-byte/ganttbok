@@ -6,6 +6,7 @@
   import { getVersion } from '@tauri-apps/api/app';
   import { store } from '../store.svelte';
   import * as ipc from '../ipc';
+  import InboxPanel from './InboxPanel.svelte';
 
   /* ---------- Update checker ---------- */
   type UpdPhase = 'idle' | 'checking' | 'no-update' | 'available' | 'downloading' | 'installed' | 'error';
@@ -154,6 +155,23 @@
       <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
       <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
     </svg>
+  </button>
+
+  <button
+    class="icon-btn inbox-btn"
+    class:has-proposals={store.inboxPatches.length > 0}
+    onclick={() => (store.inboxOpen = !store.inboxOpen)}
+    title="Inbox — {store.inboxPatches.length} pending proposal{store.inboxPatches.length === 1 ? '' : 's'}"
+    aria-label="Open Inbox"
+  >
+    <!-- Envelope icon -->
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+      <polyline points="22,6 12,13 2,6"/>
+    </svg>
+    {#if store.inboxPatches.length > 0}
+      <span class="badge">{store.inboxPatches.length}</span>
+    {/if}
   </button>
 </div>
 
@@ -374,6 +392,10 @@
   </aside>
 {/if}
 
+{#if store.inboxOpen}
+  <InboxPanel />
+{/if}
+
 <style>
   .bottom-toolbar {
     display: flex; align-items: center; gap: var(--sp-1);
@@ -488,5 +510,30 @@
     body.print-todo-mode .phase-block h3 { color: black !important; font-size: 14pt; }
     body.print-todo-mode pre { font-family: inherit; font-size: 11pt; white-space: pre-wrap; line-height: 1.5; margin: 0 0 2mm 6mm; }
     body.print-todo-mode .app-shell, body.print-todo-mode .print-header, body.print-todo-mode .print-footer { display: none !important; }
+  }
+
+  /* ============ Inbox badge button ============ */
+  .inbox-btn {
+    position: relative;
+  }
+  .inbox-btn.has-proposals {
+    color: var(--c-accent);
+  }
+  .badge {
+    position: absolute;
+    top: -2px;
+    right: -4px;
+    background: var(--c-accent);
+    color: white;
+    border-radius: 50%;
+    width: 14px;
+    height: 14px;
+    font-size: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    line-height: 1;
   }
 </style>
