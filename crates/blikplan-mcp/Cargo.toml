@@ -27,3 +27,4 @@ uuid        = { version = "1", features = ["v4"] }
 [dev-dependencies]
 rmcp        = { version = "0.3", features = ["server", "transport-io", "macros", "client", "transport-child-process"] }
 tokio       = { version = "1", features = ["full"] }
+tempfile    = "3"

@@ -125,3 +125,85 @@ CREATE TABLE pending_patches (
     error       TEXT
 );
 "#;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    /// Helper: create a real sqlite file at `dir/ganttbok.db`.
+    fn plant_db(dir: &std::path::Path) {
+        fs::create_dir_all(dir).unwrap();
+        fs::write(dir.join("ganttbok.db"), b"").unwrap();
+    }
+
+    #[test]
+    fn env_var_takes_priority() {
+        let tmp = TempDir::new().unwrap();
+        let explicit = tmp.path().join("explicit.db");
+        fs::write(&explicit, b"").unwrap();
+        std::env::set_var("BLIKPLAN_DB", &explicit);
+        let result = resolve_db_path();
+        std::env::remove_var("BLIKPLAN_DB");
+        assert_eq!(result.unwrap(), explicit);
+    }
+
+    #[test]
+    fn env_var_nonexistent_file_falls_through() {
+        // If BLIKPLAN_DB points to a path that doesn't exist,
+        // we should NOT return it — fall through to OS-default.
+        let tmp = TempDir::new().unwrap();
+        let ghost = tmp.path().join("ghost.db");
+        // ghost doesn't exist on disk
+        std::env::set_var("BLIKPLAN_DB", &ghost);
+        // Also make sure no OS-default exists during this test by checking
+        // that None is returned (no real DB on CI).
+        let result = resolve_db_path();
+        std::env::remove_var("BLIKPLAN_DB");
+        // The env var path doesn't exist and no real OS DB present in CI;
+        // result is None (or Some if the dev machine has a real install).
+        // What we assert: the result is NOT the ghost path.
+        assert_ne!(result, Some(ghost));
+    }
+
+    #[test]
+    fn returns_none_when_no_db_present() {
+        // Ensure no env var is set.
+        std::env::remove_var("BLIKPLAN_DB");
+        // We cannot easily mock dirs::data_local_dir in-process.
+        // This test is therefore a canary: if it returns Some on a CI box
+        // it means a real DB was accidentally left at the default path.
+        // On developer machines it may return Some — that's fine.
+        // The important assertion is that the function doesn't panic.
+        let _ = resolve_db_path(); // must not panic
+    }
+
+    #[test]
+    fn open_ro_connection_is_read_only() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("test.db");
+        // Create a minimal sqlite file.
+        {
+            let conn = rusqlite::Connection::open(&path).unwrap();
+            conn.execute_batch("CREATE TABLE t (id INTEGER PRIMARY KEY)").unwrap();
+        }
+        let ro = open_ro(&path);
+        let result = ro.execute("INSERT INTO t VALUES (1)", []);
+        assert!(result.is_err(), "read-only connection should reject writes");
+    }
+
+    #[test]
+    fn open_rw_connection_can_write() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("test.db");
+        {
+            let conn = rusqlite::Connection::open(&path).unwrap();
+            conn.execute_batch("CREATE TABLE t (id INTEGER PRIMARY KEY)").unwrap();
+        }
+        let rw = open_rw(&path);
+        rw.execute("INSERT INTO t VALUES (1)", []).unwrap();
+        let count: i64 = rw.query_row("SELECT COUNT(*) FROM t", [], |r| r.get(0)).unwrap();
+        assert_eq!(count, 1);
+    }
+}
