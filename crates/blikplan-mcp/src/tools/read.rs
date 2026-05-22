@@ -56,6 +56,18 @@ pub struct FullJob {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Contact output type
+// ──────────────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize)]
+pub struct ContactSummary {
+    pub id: i64,
+    pub name: String,
+    pub telegram_handle: Option<String>,
+    pub notes: String,
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Input parameter structs
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -63,6 +75,19 @@ pub struct FullJob {
 pub struct GetJobParams {
     /// DB integer id of the job to fetch.
     pub job_id: i64,
+}
+
+#[derive(Debug, Deserialize, JsonSchema, Default)]
+pub struct ListTasksParams {
+    /// Optional job id to filter tasks by. If omitted, returns tasks from all jobs.
+    #[serde(default)]
+    pub job_id: Option<i64>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema, Default)]
+pub struct GetTaskParams {
+    /// DB integer id of the task to fetch.
+    pub task_id: i64,
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -139,4 +164,69 @@ pub fn query_get_job(conn: &Connection, job_id: i64) -> Result<FullJob, String> 
     .collect::<Result<Vec<_>, _>>()?;
 
     Ok(FullJob { id: job_id, name, client, address, project_start_date, region, phases, dependencies })
+}
+
+pub fn query_list_tasks(conn: &Connection, job_id: Option<i64>) -> Result<Vec<TaskSummary>, String> {
+    let row_mapper = |r: &rusqlite::Row<'_>| Ok(TaskSummary {
+        id: r.get(0)?,
+        name: r.get(1)?,
+        start_date: r.get(2)?,
+        duration_workdays: r.get(3)?,
+        notes: r.get(4)?,
+        contact_id: r.get(5)?,
+    });
+    if let Some(jid) = job_id {
+        let mut stmt = conn.prepare(
+            "SELECT t.id, t.name, t.start_date, t.duration_workdays, t.notes, t.contact_id
+             FROM task t
+             JOIN phase p ON p.id = t.phase_id
+             WHERE p.job_id = ?1
+             ORDER BY t.start_date, t.order_index"
+        ).map_err(|e| e.to_string())?;
+        let result: Result<Vec<_>, _> = stmt.query_map([jid], row_mapper)
+            .map_err(|e| e.to_string())?
+            .map(|r| r.map_err(|e| e.to_string()))
+            .collect();
+        result
+    } else {
+        let mut stmt = conn.prepare(
+            "SELECT t.id, t.name, t.start_date, t.duration_workdays, t.notes, t.contact_id
+             FROM task t
+             ORDER BY t.start_date, t.order_index"
+        ).map_err(|e| e.to_string())?;
+        let result: Result<Vec<_>, _> = stmt.query_map([], row_mapper)
+            .map_err(|e| e.to_string())?
+            .map(|r| r.map_err(|e| e.to_string()))
+            .collect();
+        result
+    }
+}
+
+pub fn query_get_task(conn: &Connection, task_id: i64) -> Result<TaskSummary, String> {
+    conn.query_row(
+        "SELECT id, name, start_date, duration_workdays, notes, contact_id
+         FROM task WHERE id = ?1",
+        [task_id],
+        |r| Ok(TaskSummary {
+            id: r.get(0)?,
+            name: r.get(1)?,
+            start_date: r.get(2)?,
+            duration_workdays: r.get(3)?,
+            notes: r.get(4)?,
+            contact_id: r.get(5)?,
+        }),
+    ).map_err(|e| format!("task {task_id} not found: {e}"))
+}
+
+pub fn query_list_contacts(conn: &Connection) -> Result<Vec<ContactSummary>, String> {
+    let mut stmt = conn.prepare(
+        "SELECT id, name, telegram_handle, notes FROM contact ORDER BY name"
+    ).map_err(|e| e.to_string())?;
+    let rows = stmt.query_map([], |r| Ok(ContactSummary {
+        id: r.get(0)?,
+        name: r.get(1)?,
+        telegram_handle: r.get(2)?,
+        notes: r.get(3)?,
+    })).map_err(|e| e.to_string())?;
+    rows.map(|r| r.map_err(|e| e.to_string())).collect()
 }

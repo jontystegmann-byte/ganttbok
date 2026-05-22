@@ -9,7 +9,11 @@ use rmcp::{
     tool, tool_handler, tool_router,
 };
 
-use crate::tools::read::{GetJobParams, query_list_jobs, query_get_job};
+use crate::tools::read::{
+    GetJobParams, ListTasksParams, GetTaskParams,
+    query_list_jobs, query_get_job,
+    query_list_tasks, query_get_task, query_list_contacts,
+};
 
 pub struct BlikPlanServer {
     pub(crate) db: Arc<Mutex<Connection>>,
@@ -42,6 +46,33 @@ impl BlikPlanServer {
         match query_get_job(&conn, p.job_id) {
             Ok(job) => serde_json::to_string_pretty(&job).unwrap_or_else(|e| e.to_string()),
             Err(e) => format!("{{\"error\":\"not_found\",\"detail\":\"{e}\"}}"),
+        }
+    }
+
+    #[tool(description = "List tasks, optionally filtered by job_id. Returns id, name, start_date, duration_workdays, notes, contact_id.")]
+    async fn list_tasks(&self, Parameters(p): Parameters<ListTasksParams>) -> String {
+        let conn = self.db.lock().unwrap();
+        match query_list_tasks(&conn, p.job_id) {
+            Ok(tasks) => serde_json::to_string_pretty(&tasks).unwrap_or_else(|e| e.to_string()),
+            Err(e) => format!("{{\"error\":\"{e}\"}}"),
+        }
+    }
+
+    #[tool(description = "Get a single task by id.")]
+    async fn get_task(&self, Parameters(p): Parameters<GetTaskParams>) -> String {
+        let conn = self.db.lock().unwrap();
+        match query_get_task(&conn, p.task_id) {
+            Ok(task) => serde_json::to_string_pretty(&task).unwrap_or_else(|e| e.to_string()),
+            Err(e) => format!("{{\"error\":\"not_found\",\"detail\":\"{e}\"}}"),
+        }
+    }
+
+    #[tool(description = "List all contacts. Returns id, name, telegram_handle, notes.")]
+    async fn list_contacts(&self) -> String {
+        let conn = self.db.lock().unwrap();
+        match query_list_contacts(&conn) {
+            Ok(contacts) => serde_json::to_string_pretty(&contacts).unwrap_or_else(|e| e.to_string()),
+            Err(e) => format!("{{\"error\":\"{e}\"}}"),
         }
     }
 }

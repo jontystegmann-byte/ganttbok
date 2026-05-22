@@ -135,3 +135,86 @@ async fn get_job_unknown_id_returns_error() {
     assert!(text.contains("not_found") || text.contains("error"), "expected error in: {text}");
     client.cancel().await.unwrap();
 }
+
+#[tokio::test]
+async fn list_tasks_filters_by_job_id() {
+    let client = make_client(fixture::with_one_job()).await;
+    let result = client.call_tool(rmcp::model::CallToolRequestParam {
+        name: "list_tasks".into(),
+        arguments: Some(serde_json::json!({ "job_id": 1 }).as_object().unwrap().clone()),
+    }).await.unwrap();
+    let text = result.content.first()
+        .and_then(|c| c.raw.as_text())
+        .map(|t| t.text.as_str())
+        .unwrap_or("");
+    assert!(text.contains("Pour slab"), "expected task in: {text}");
+    client.cancel().await.unwrap();
+}
+
+#[tokio::test]
+async fn list_tasks_no_filter_returns_all() {
+    let client = make_client(fixture::with_one_job()).await;
+    let result = client.call_tool(rmcp::model::CallToolRequestParam {
+        name: "list_tasks".into(),
+        arguments: None,
+    }).await.unwrap();
+    let text = result.content.first()
+        .and_then(|c| c.raw.as_text())
+        .map(|t| t.text.as_str())
+        .unwrap_or("");
+    assert!(text.contains("Pour slab"), "expected task in: {text}");
+    client.cancel().await.unwrap();
+}
+
+#[tokio::test]
+async fn get_task_returns_task() {
+    let client = make_client(fixture::with_one_job()).await;
+    let result = client.call_tool(rmcp::model::CallToolRequestParam {
+        name: "get_task".into(),
+        arguments: Some(serde_json::json!({ "task_id": 1 }).as_object().unwrap().clone()),
+    }).await.unwrap();
+    let text = result.content.first()
+        .and_then(|c| c.raw.as_text())
+        .map(|t| t.text.as_str())
+        .unwrap_or("");
+    assert!(text.contains("Pour slab"), "expected task name in: {text}");
+    client.cancel().await.unwrap();
+}
+
+#[tokio::test]
+async fn list_contacts_returns_empty_when_none() {
+    let client = make_client(fixture::with_one_job()).await;
+    let result = client.call_tool(rmcp::model::CallToolRequestParam {
+        name: "list_contacts".into(),
+        arguments: None,
+    }).await.unwrap();
+    let text = result.content.first()
+        .and_then(|c| c.raw.as_text())
+        .map(|t| t.text.as_str())
+        .unwrap_or("");
+    // No contacts in fixture — should return empty array.
+    assert!(text.trim() == "[]" || text.contains("[]"), "expected empty array: {text}");
+    client.cancel().await.unwrap();
+}
+
+#[tokio::test]
+async fn list_contacts_returns_contacts() {
+    let db = {
+        let conn = fixture_db();
+        conn.execute_batch(
+            "INSERT INTO contact (name, telegram_handle, notes) VALUES ('Doug', '@doug_sa', 'supplier');"
+        ).unwrap();
+        conn
+    };
+    let client = make_client(db).await;
+    let result = client.call_tool(rmcp::model::CallToolRequestParam {
+        name: "list_contacts".into(),
+        arguments: None,
+    }).await.unwrap();
+    let text = result.content.first()
+        .and_then(|c| c.raw.as_text())
+        .map(|t| t.text.as_str())
+        .unwrap_or("");
+    assert!(text.contains("Doug"), "expected Doug in: {text}");
+    client.cancel().await.unwrap();
+}
