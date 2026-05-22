@@ -14,7 +14,7 @@ use commands::Db;
 use std::path::PathBuf;
 use tauri::Manager;
 
-fn db_path() -> PathBuf {
+pub(crate) fn db_path() -> PathBuf {
     let dir = dirs::data_local_dir()
         .expect("no data_local_dir")
         .join("Gantt Bok");
@@ -106,6 +106,9 @@ pub fn run() {
             commands::patches::reject_patch,
             commands::patches::clear_resolved_patches,
             commands::patches::expire_stale_patches,
+            commands::claude::detect_claude_surfaces,
+            commands::claude::connect_to_claude,
+            commands::claude::disconnect_from_claude,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
