@@ -106,6 +106,25 @@ const MIGRATIONS: &[&str] = &[
     ALTER TABLE task ADD COLUMN contact_id INTEGER REFERENCES contact(id) ON DELETE SET NULL;
     ALTER TABLE task ADD COLUMN last_chaser_sent_at TEXT;
     "#,
+    // v7 — pending_patches queue for proposals coming from external sources (MCP, webhooks).
+    // Status lifecycle: proposed → accepted → applied  (or proposed → rejected/expired,
+    //                                                   or accepted → apply_failed).
+    r#"
+    CREATE TABLE pending_patches (
+        id            TEXT    PRIMARY KEY,
+        job_id        INTEGER NOT NULL REFERENCES job(id) ON DELETE CASCADE,
+        patch_json    TEXT    NOT NULL,
+        summary       TEXT    NOT NULL,
+        source        TEXT    NOT NULL DEFAULT 'mcp',
+        status        TEXT    NOT NULL DEFAULT 'proposed'
+                              CHECK (status IN ('proposed','accepted','applied','rejected','apply_failed','expired')),
+        created_at    INTEGER NOT NULL,
+        resolved_at   INTEGER,
+        error         TEXT
+    );
+    CREATE INDEX idx_pending_patches_status_created
+        ON pending_patches(status, created_at);
+    "#,
 ];
 
 pub fn apply_migrations(conn: &Connection) -> GbResult<()> {
@@ -178,5 +197,57 @@ mod tests {
             [],
         );
         assert!(bad.is_err(), "expected FK violation");
+    }
+
+    #[test]
+    fn pending_patches_table_exists_with_expected_columns() {
+        let conn = Connection::open_in_memory().unwrap();
+        apply_migrations(&conn).unwrap();
+
+        let cols: Vec<String> = conn
+            .prepare("PRAGMA table_info(pending_patches)")
+            .unwrap()
+            .query_map([], |r| r.get::<_, String>(1))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+
+        for expected in &[
+            "id", "job_id", "patch_json", "summary", "source",
+            "status", "created_at", "resolved_at", "error",
+        ] {
+            assert!(
+                cols.iter().any(|c| c == expected),
+                "missing column {expected}; got {cols:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn pending_patches_default_status_is_proposed() {
+        let conn = Connection::open_in_memory().unwrap();
+        apply_migrations(&conn).unwrap();
+
+        // Need a job to satisfy FK.
+        conn.execute(
+            "INSERT INTO job (name, project_start_date) VALUES ('t', '2026-01-01')",
+            [],
+        ).unwrap();
+        let job_id: i64 = conn.last_insert_rowid();
+
+        conn.execute(
+            "INSERT INTO pending_patches (id, job_id, patch_json, summary, created_at)
+             VALUES ('p1', ?1, '{}', 's', 0)",
+            params![job_id],
+        ).unwrap();
+
+        let status: String = conn
+            .query_row(
+                "SELECT status FROM pending_patches WHERE id = 'p1'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(status, "proposed");
     }
 }
