@@ -23,6 +23,14 @@ fn db_path() -> PathBuf {
 
 pub fn run() {
     let conn = db::connection::open(&db_path()).expect("failed to open db");
+
+    // Sweep any proposed patches older than 30 days to 'expired'.
+    // This runs synchronously before the window opens, so the Inbox
+    // never shows stale rows.
+    if let Err(e) = commands::patches::expire_stale_patches_inner(&conn) {
+        eprintln!("warn: expire_stale_patches on startup failed: {e}");
+    }
+
     let db = Db::new(conn);
 
     let mut builder = tauri::Builder::default();
@@ -95,6 +103,8 @@ pub fn run() {
             commands::patches::get_pending_patch,
             commands::patches::accept_patch,
             commands::patches::reject_patch,
+            commands::patches::clear_resolved_patches,
+            commands::patches::expire_stale_patches,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
