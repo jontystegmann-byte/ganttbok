@@ -25,6 +25,10 @@ pub const DEFAULT_MANUAL: &str = "Update me on *{task}* — what's the latest?";
 pub const DEFAULT_APPROACHING: &str = "*{task}* deadline is in {days} days — still on track?";
 pub const DEFAULT_OVERDUE: &str = "*{task}* was due {days_abs} days ago — what's the blocker?";
 
+/// The set of valid chaser template keys accepted by `apply_add_chaser`.
+/// Matches the hard-coded keys handled in `commands::chaser::send_chaser`.
+pub const VALID_CHASER_TEMPLATE_KEYS: &[&str] = &["manual", "approaching", "overdue"];
+
 #[cfg(test)]
 mod tests {
     use super::*;

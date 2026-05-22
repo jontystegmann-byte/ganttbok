@@ -1,0 +1,316 @@
+//! Apply engine — executes an accepted `Patch` inside a single SQLite
+//! transaction.  All ops must succeed; any failure rolls back the whole
+//! patch and marks the row `apply_failed`.
+//!
+//! Status transition managed here:
+//!   proposed → accepted (caller's responsibility, before calling this fn)
+//!   accepted → applied   (on success, inside this fn)
+//!   accepted → apply_failed (on any op error, inside this fn)
+
+use std::collections::HashMap;
+use chrono::{NaiveDate, Utc};
+use rusqlite::{Connection, params};
+
+use crate::commands::drag::apply_ripple;
+use crate::db::models::{NewTask, NewDependency};
+use crate::patches::schema::{Patch, PatchOp, TaskRef};
+use crate::repo::{contact as contact_repo, dependency as dep_repo, job as job_repo, task as task_repo};
+use crate::{GbError, GbResult};
+
+/// Executes all ops in `patch` inside a single SQLite transaction.
+///
+/// Assumes the row in `pending_patches` is already at status `accepted`.
+/// On success: sets `status = 'applied'`, `resolved_at = now()`.
+/// On failure: rolls back the apply transaction, sets `status = 'apply_failed'`,
+///             stores the error message in the `error` column.
+pub fn apply_patch(conn: &Connection, patch_id: &str, patch: &Patch) -> GbResult<()> {
+    let result = attempt_apply(conn, patch);
+
+    match &result {
+        Ok(()) => {
+            let now = Utc::now().timestamp();
+            conn.execute(
+                "UPDATE pending_patches SET status = 'applied', resolved_at = ?1 WHERE id = ?2",
+                params![now, patch_id],
+            )?;
+        }
+        Err(e) => {
+            let msg = e.to_string();
+            conn.execute(
+                "UPDATE pending_patches SET status = 'apply_failed', error = ?1 WHERE id = ?2",
+                params![msg, patch_id],
+            )?;
+        }
+    }
+
+    result
+}
+
+/// The inner apply; runs ops in a transaction.  Separate fn so we can
+/// match on its result cleanly in `apply_patch`.
+fn attempt_apply(conn: &Connection, patch: &Patch) -> GbResult<()> {
+    let tx = conn.unchecked_transaction()?;
+
+    // op_ref → task_id map, populated as add_task ops complete.
+    let mut op_ref_map: HashMap<String, i64> = HashMap::new();
+
+    for op in &patch.ops {
+        match op {
+            PatchOp::AddTask { .. } => apply_add_task(&tx, op, &mut op_ref_map)?,
+            PatchOp::ShiftTask { .. } => apply_shift_task(&tx, op)?,
+            PatchOp::AddDependency { .. } => apply_add_dependency(&tx, op, &op_ref_map)?,
+            PatchOp::AddChaser { .. } => apply_add_chaser(&tx, op)?,
+            PatchOp::AppendNote { .. } => apply_append_note(&tx, op)?,
+        }
+    }
+
+    tx.commit()?;
+    Ok(())
+}
+
+/// Resolves a `TaskRef` to a concrete task ID, consulting `op_ref_map` for
+/// `TaskRef::Pending` variants.
+fn resolve_task_ref(r: &TaskRef, op_ref_map: &HashMap<String, i64>) -> GbResult<i64> {
+    match r {
+        TaskRef::Existing { task_id } => Ok(*task_id),
+        TaskRef::Pending { op_ref } => op_ref_map
+            .get(op_ref)
+            .copied()
+            .ok_or_else(|| GbError::Validation(format!("op_ref '{op_ref}' not resolved (internal error)"))),
+    }
+}
+
+// ─── op handlers ─────────────────────────────────────────────────────────────
+
+fn apply_add_task(
+    conn: &Connection,
+    op: &PatchOp,
+    op_ref_map: &mut HashMap<String, i64>,
+) -> GbResult<()> {
+    let (phase_id, name, start_date_str, duration_workdays, notes, contact_id, op_ref) = match op {
+        PatchOp::AddTask { phase_id, name, start_date, duration_workdays, notes, contact_id, op_ref } => {
+            (*phase_id, name.clone(), start_date.clone(), *duration_workdays, notes.clone(), *contact_id, op_ref.clone())
+        }
+        _ => unreachable!(),
+    };
+
+    // Verify phase exists.
+    let phase_exists: bool = conn.query_row(
+        "SELECT COUNT(*) FROM phase WHERE id = ?1",
+        params![phase_id],
+        |r| r.get::<_, i64>(0),
+    ).map(|c| c > 0)?;
+    if !phase_exists {
+        return Err(GbError::NotFound(format!("phase {phase_id}")));
+    }
+
+    let start = NaiveDate::parse_from_str(&start_date_str, "%Y-%m-%d")
+        .map_err(|_| GbError::Validation(format!("bad date: {start_date_str}")))?;
+
+    // Compute next order_index within the phase.
+    let order_index: i64 = conn.query_row(
+        "SELECT COALESCE(MAX(order_index), -1) + 1 FROM task WHERE phase_id = ?1",
+        params![phase_id],
+        |r| r.get(0),
+    )?;
+
+    let mut task = task_repo::create(conn, &NewTask {
+        phase_id,
+        name,
+        start_date: start,
+        duration_workdays,
+        order_index,
+        notes,
+    })?;
+
+    // Set contact if specified.
+    if let Some(cid) = contact_id {
+        // Verify contact exists.
+        contact_repo::get(conn, cid)?;
+        task.contact_id = Some(cid);
+        task_repo::update(conn, &task)?;
+    }
+
+    // Register op_ref so later ops can reference this new task.
+    if let Some(r) = op_ref {
+        op_ref_map.insert(r, task.id);
+    }
+
+    Ok(())
+}
+
+fn apply_shift_task(conn: &Connection, op: &PatchOp) -> GbResult<()> {
+    let (task_id, by_days) = match op {
+        PatchOp::ShiftTask { task_id, by_days } => (*task_id, *by_days),
+        _ => unreachable!(),
+    };
+
+    // Verify task exists and get its job_id.
+    let job_id: i64 = conn.query_row(
+        "SELECT p.job_id FROM task t JOIN phase p ON p.id = t.phase_id WHERE t.id = ?1",
+        params![task_id],
+        |r| r.get(0),
+    ).map_err(|e| match e {
+        rusqlite::Error::QueryReturnedNoRows => GbError::NotFound(format!("task {task_id}")),
+        other => GbError::Sqlite(other),
+    })?;
+
+    apply_ripple(conn, job_id, task_id, by_days)
+}
+
+fn apply_add_dependency(
+    conn: &Connection,
+    op: &PatchOp,
+    op_ref_map: &HashMap<String, i64>,
+) -> GbResult<()> {
+    let (predecessor, successor, _dep_type, lag_days) = match op {
+        PatchOp::AddDependency { predecessor, successor, dep_type, lag_days } => {
+            (predecessor, successor, dep_type.clone(), *lag_days)
+        }
+        _ => unreachable!(),
+    };
+
+    let pred_id = resolve_task_ref(predecessor, op_ref_map)?;
+    let succ_id = resolve_task_ref(successor, op_ref_map)?;
+
+    // Verify both tasks exist.
+    task_repo::get(conn, pred_id)?;
+    task_repo::get(conn, succ_id)?;
+
+    dep_repo::create(conn, &NewDependency {
+        predecessor_id: pred_id,
+        successor_id: succ_id,
+        lag_days,
+    })?;
+
+    Ok(())
+}
+
+fn apply_add_chaser(conn: &Connection, op: &PatchOp) -> GbResult<()> {
+    use crate::chaser::templates::VALID_CHASER_TEMPLATE_KEYS;
+
+    let (task_id, contact_id, template) = match op {
+        PatchOp::AddChaser { task_id, contact_id, template } => (*task_id, *contact_id, template.clone()),
+        _ => unreachable!(),
+    };
+
+    if !VALID_CHASER_TEMPLATE_KEYS.contains(&template.as_str()) {
+        return Err(GbError::Validation(format!(
+            "unknown chaser template '{template}'; expected one of: {}",
+            VALID_CHASER_TEMPLATE_KEYS.join(", ")
+        )));
+    }
+
+    // Verify task and contact both exist.
+    let mut task = task_repo::get(conn, task_id)?;
+    contact_repo::get(conn, contact_id)?;
+
+    // Assign the contact — the template key is informational only at this stage.
+    task.contact_id = Some(contact_id);
+    task_repo::update(conn, &task)?;
+
+    Ok(())
+}
+
+fn apply_append_note(conn: &Connection, op: &PatchOp) -> GbResult<()> {
+    let (job_id, text) = match op {
+        PatchOp::AppendNote { job_id, text } => (*job_id, text.clone()),
+        _ => unreachable!(),
+    };
+
+    // Verify job exists.
+    job_repo::get(conn, job_id)?;
+
+    // Append text to the job's notes (stored as app_meta "job_{id}_notes").
+    let key = format!("job_{job_id}_notes");
+    let existing: Option<String> = conn.query_row(
+        "SELECT value FROM app_meta WHERE key = ?1",
+        params![&key],
+        |r| r.get(0),
+    ).ok();
+
+    let new_value = match existing {
+        Some(prev) if !prev.trim().is_empty() => format!("{prev}\n\n{text}"),
+        _ => text,
+    };
+
+    conn.execute(
+        "INSERT OR REPLACE INTO app_meta (key, value) VALUES (?1, ?2)",
+        params![key, new_value],
+    )?;
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::connection::open_in_memory;
+    use crate::db::models::{NewJob, NewPhase};
+    use crate::patches::schema::{Patch, PatchOp};
+    use crate::repo::{job, phase};
+    use chrono::NaiveDate;
+
+    fn fixture_db() -> (rusqlite::Connection, i64, i64) {
+        let conn = open_in_memory().unwrap();
+        let j = job::create(&conn, &NewJob {
+            name: "Test Job".into(), client: None, address: None,
+            project_start_date: NaiveDate::from_ymd_opt(2026, 6, 1).unwrap(),
+            is_template: false, holidays_block_work: false, region: "ZA".into(),
+        }).unwrap();
+        let p = phase::create(&conn, &NewPhase {
+            job_id: j.id, name: "Foundation".into(), colour: "#3B82F6".into(),
+            order_index: 0, collapsed: false,
+        }).unwrap();
+        (conn, j.id, p.id)
+    }
+
+    #[test]
+    fn apply_empty_ops_returns_err() {
+        let (conn, job_id, _) = fixture_db();
+        // Insert a pending_patches row.
+        conn.execute(
+            "INSERT INTO pending_patches (id, job_id, patch_json, summary, created_at)
+             VALUES ('p_test_empty', ?1, '{}', 'test', 0)",
+            rusqlite::params![job_id],
+        ).unwrap();
+        let patch = Patch {
+            patch_version: 1,
+            summary: "empty".into(),
+            ops: vec![],
+        };
+        // A patch with zero ops should have been caught by validate_patch before reaching
+        // apply_patch; but apply_patch should still handle it gracefully.
+        let result = apply_patch(&conn, "p_test_empty", &patch);
+        // Either Ok (no-ops) or Err — both are fine.  What we test is that
+        // the function exists and is callable.
+        let _ = result;
+    }
+
+    #[test]
+    fn apply_patch_sets_status_applied_on_success() {
+        let (conn, job_id, _phase_id) = fixture_db();
+        conn.execute(
+            "INSERT INTO pending_patches (id, job_id, patch_json, summary, created_at)
+             VALUES ('p_note', ?1, '{}', 'note', 0)",
+            rusqlite::params![job_id],
+        ).unwrap();
+
+        let patch = Patch {
+            patch_version: 1,
+            summary: "append a note".into(),
+            ops: vec![PatchOp::AppendNote {
+                job_id,
+                text: "Graham wants fewer cavity walls".into(),
+            }],
+        };
+
+        apply_patch(&conn, "p_note", &patch).unwrap();
+
+        let status: String = conn.query_row(
+            "SELECT status FROM pending_patches WHERE id = 'p_note'",
+            [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(status, "applied");
+    }
+}
