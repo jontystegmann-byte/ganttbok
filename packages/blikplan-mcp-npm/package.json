@@ -1,0 +1,24 @@
+{
+  "name": "@blikplan/mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Blik Plan — connects Claude to your schedule",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jontystegmann-byte/ganttbok"
+  },
+  "bin": {
+    "blikplan-mcp": "bin/blikplan-mcp"
+  },
+  "scripts": {
+    "postinstall": "node postinstall.js"
+  },
+  "files": [
+    "bin/",
+    "postinstall.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}

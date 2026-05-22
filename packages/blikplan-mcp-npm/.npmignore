@@ -1,0 +1,4 @@
+# Exclude everything except the files listed in package.json "files" array.
+# The bin/ directory is populated at postinstall time; exclude any cached binary.
+bin/blikplan-mcp
+bin/blikplan-mcp.exe
