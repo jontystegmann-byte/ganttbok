@@ -1,6 +1,29 @@
 [package]
+name        = "blikplan-mcp"
+version     = "0.1.0"
+edition     = "2021"
+
+[[bin]]
 name = "blikplan-mcp"
-version = "0.0.1"
-edition = "2021"
-publish = false
-# Stub crate — Task 2 of Plan 2 will replace this with the real MCP server.
+path = "src/main.rs"
+
+[lib]
+name = "blikplan_mcp"
+path = "src/lib.rs"
+
+[dependencies]
+gb-patches  = { path = "../gb-patches" }
+rmcp        = { version = "0.3", features = ["server", "transport-io", "macros"] }
+rusqlite    = { version = "0.31", features = ["bundled"] }
+serde       = { version = "1", features = ["derive"] }
+serde_json  = "1"
+schemars    = "1"
+chrono      = { version = "0.4", features = ["serde"] }
+thiserror   = "1"
+dirs        = "5"
+tokio       = { version = "1", features = ["full"] }
+uuid        = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+rmcp        = { version = "0.3", features = ["server", "transport-io", "macros", "client", "transport-child-process"] }
+tokio       = { version = "1", features = ["full"] }
