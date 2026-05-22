@@ -53,10 +53,10 @@ pub fn apply_migrations_for_test(conn: &Connection) {
     // Inline the same migration text as ganttbok_lib's db::migrations.
     // We copy only the subset needed for MCP server tests: job, phase, task,
     // contact, dependency, pending_patches.
-    conn.execute_batch(FIXTURE_SCHEMA).expect("fixture schema failed");
+    conn.execute_batch(FIXTURE_SCHEMA_FOR_TEST).expect("fixture schema failed");
 }
 
-const FIXTURE_SCHEMA: &str = r#"
+pub const FIXTURE_SCHEMA_FOR_TEST: &str = r#"
 CREATE TABLE app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 
 CREATE TABLE job (

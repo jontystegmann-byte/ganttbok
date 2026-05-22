@@ -1,4 +1,5 @@
 use std::future::Future;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use rusqlite::Connection;
 use rmcp::{
@@ -15,9 +16,13 @@ use crate::tools::read::{
     query_list_tasks, query_get_task, query_list_contacts,
     query_search, query_today,
 };
+use crate::tools::write::{ProposePatchParams, handle_propose_patch};
 
 pub struct BlikPlanServer {
     pub(crate) db: Arc<Mutex<Connection>>,
+    /// Path used to open short-lived RW connections for write tools.
+    /// `None` in unit tests that use an in-memory connection only.
+    pub(crate) db_path: Option<PathBuf>,
     tool_router: ToolRouter<Self>,
 }
 
@@ -25,6 +30,17 @@ impl BlikPlanServer {
     pub fn new(db: Arc<Mutex<Connection>>) -> Self {
         Self {
             db,
+            db_path: None,
+            tool_router: Self::tool_router(),
+        }
+    }
+
+    /// Constructor used by integration tests and the real binary, which need
+    /// a writable DB path for `propose_patch`.
+    pub fn new_with_path(db: Arc<Mutex<Connection>>, db_path: PathBuf) -> Self {
+        Self {
+            db,
+            db_path: Some(db_path),
             tool_router: Self::tool_router(),
         }
     }
@@ -96,6 +112,11 @@ impl BlikPlanServer {
             Ok(items) => serde_json::to_string_pretty(&items).unwrap_or_else(|e| e.to_string()),
             Err(e) => format!("{{\"error\":\"{e}\"}}"),
         }
+    }
+
+    #[tool(description = "Propose a patch to a Blik Plan schedule. The patch is validated and inserted into the pending_patches inbox for the user to review and accept or reject. Returns patch_id, status, preview, and inbox_count.")]
+    async fn propose_patch(&self, Parameters(p): Parameters<ProposePatchParams>) -> String {
+        handle_propose_patch(self, p).await
     }
 }
 
