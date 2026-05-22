@@ -1,5 +1,6 @@
 <script lang="ts">
   import { store } from '../store.svelte';
+  import ConnectToClaude from './ConnectToClaude.svelte';
 
   let open = $state(false);
 
@@ -99,6 +100,10 @@
         </p>
       </section>
     {/if}
+
+    <section>
+      <ConnectToClaude />
+    </section>
   </div>
 {/if}
 
