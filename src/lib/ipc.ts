@@ -5,6 +5,7 @@ import type {
   AddManualArgs, SyncSaArgs, InstantiateArgs, DragTaskArgs,
   Contact, NudgeResult,
   PendingPatch,
+  ClaudeSurface, ClaudeDetectionResult,
 } from './types';
 
 // Jobs
@@ -110,3 +111,16 @@ export const clearResolvedPatches = () =>
 
 export const expireStalePatches = () =>
   invoke<number>('expire_stale_patches');
+
+// Claude connector
+export async function detectClaudeSurfaces(): Promise<ClaudeDetectionResult> {
+  return invoke('detect_claude_surfaces');
+}
+
+export async function connectToClaude(surfaces: ClaudeSurface[]): Promise<ClaudeDetectionResult> {
+  return invoke('connect_to_claude', { surfaces });
+}
+
+export async function disconnectFromClaude(surfaces: ClaudeSurface[]): Promise<ClaudeDetectionResult> {
+  return invoke('disconnect_from_claude', { surfaces });
+}

@@ -217,3 +217,22 @@ export interface PendingPatch {
   resolved_at: number | null;
   error: string | null;
 }
+
+// ---------------------------------------------------------------
+// Claude connector — Settings → Integrations.
+// Mirrors src-tauri/src/commands/claude.rs.
+// ---------------------------------------------------------------
+
+export type ClaudeSurface = 'code' | 'desktop';
+
+export interface ClaudeDetection {
+  surface: ClaudeSurface;
+  display_name: string;
+  config_path: string;
+  config_exists: boolean;
+  blikplan_connected: boolean;
+}
+
+export interface ClaudeDetectionResult {
+  surfaces: ClaudeDetection[];
+}
