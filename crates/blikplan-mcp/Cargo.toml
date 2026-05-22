@@ -1,0 +1,6 @@
+[package]
+name = "blikplan-mcp"
+version = "0.0.1"
+edition = "2021"
+publish = false
+# Stub crate — Task 2 of Plan 2 will replace this with the real MCP server.
