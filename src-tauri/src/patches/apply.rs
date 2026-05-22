@@ -606,4 +606,147 @@ mod tests {
         ).unwrap();
         assert_eq!(status, "apply_failed");
     }
+
+    #[test]
+    fn add_chaser_assigns_contact_to_task() {
+        let (conn, job_id, phase_id) = fixture_db();
+        let task = crate::repo::task::create(&conn, &crate::db::models::NewTask {
+            phase_id, name: "Solar plans".into(),
+            start_date: NaiveDate::from_ymd_opt(2026, 6, 8).unwrap(),
+            duration_workdays: 1, order_index: 0, notes: None,
+        }).unwrap();
+        let contact = crate::repo::contact::create(&conn, &crate::db::models::NewContact {
+            name: "Renaissance Solar".into(),
+            telegram_chat_id: Some("111222333".into()),
+            telegram_handle: None,
+            notes: "".into(),
+        }).unwrap();
+
+        conn.execute(
+            "INSERT INTO pending_patches (id, job_id, patch_json, summary, created_at)
+             VALUES ('p_chaser', ?1, '{}', 'chaser', 0)",
+            rusqlite::params![job_id],
+        ).unwrap();
+
+        let patch = Patch {
+            patch_version: 1,
+            summary: "add chaser".into(),
+            ops: vec![PatchOp::AddChaser {
+                task_id: task.id,
+                contact_id: contact.id,
+                template: "weekly".into(),
+            }],
+        };
+
+        // "weekly" is not a valid template key — should fail.
+        let result = apply_patch(&conn, "p_chaser", &patch);
+        assert!(result.is_err());
+
+        let status: String = conn.query_row(
+            "SELECT status FROM pending_patches WHERE id = 'p_chaser'",
+            [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(status, "apply_failed");
+    }
+
+    #[test]
+    fn add_chaser_valid_template_assigns_contact() {
+        let (conn, job_id, phase_id) = fixture_db();
+        let task = crate::repo::task::create(&conn, &crate::db::models::NewTask {
+            phase_id, name: "Solar plans".into(),
+            start_date: NaiveDate::from_ymd_opt(2026, 6, 8).unwrap(),
+            duration_workdays: 1, order_index: 0, notes: None,
+        }).unwrap();
+        let contact = crate::repo::contact::create(&conn, &crate::db::models::NewContact {
+            name: "Renaissance Solar".into(),
+            telegram_chat_id: Some("111222333".into()),
+            telegram_handle: None,
+            notes: "".into(),
+        }).unwrap();
+
+        conn.execute(
+            "INSERT INTO pending_patches (id, job_id, patch_json, summary, created_at)
+             VALUES ('p_chaser2', ?1, '{}', 'chaser2', 0)",
+            rusqlite::params![job_id],
+        ).unwrap();
+
+        let patch = Patch {
+            patch_version: 1,
+            summary: "add chaser with valid key".into(),
+            ops: vec![PatchOp::AddChaser {
+                task_id: task.id,
+                contact_id: contact.id,
+                template: "manual".into(),
+            }],
+        };
+
+        apply_patch(&conn, "p_chaser2", &patch).unwrap();
+
+        let updated = crate::repo::task::get(&conn, task.id).unwrap();
+        assert_eq!(updated.contact_id, Some(contact.id));
+    }
+
+    #[test]
+    fn append_note_creates_and_appends_to_job_notes() {
+        let (conn, job_id, _phase_id) = fixture_db();
+        conn.execute(
+            "INSERT INTO pending_patches (id, job_id, patch_json, summary, created_at)
+             VALUES ('p_note1', ?1, '{}', 'note1', 0)",
+            rusqlite::params![job_id],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO pending_patches (id, job_id, patch_json, summary, created_at)
+             VALUES ('p_note2', ?1, '{}', 'note2', 0)",
+            rusqlite::params![job_id],
+        ).unwrap();
+
+        // First note.
+        let patch1 = Patch {
+            patch_version: 1,
+            summary: "first note".into(),
+            ops: vec![PatchOp::AppendNote { job_id, text: "Line one".into() }],
+        };
+        apply_patch(&conn, "p_note1", &patch1).unwrap();
+
+        // Second note — should append.
+        let patch2 = Patch {
+            patch_version: 1,
+            summary: "second note".into(),
+            ops: vec![PatchOp::AppendNote { job_id, text: "Line two".into() }],
+        };
+        apply_patch(&conn, "p_note2", &patch2).unwrap();
+
+        let stored: String = conn.query_row(
+            "SELECT value FROM app_meta WHERE key = ?1",
+            rusqlite::params![format!("job_{job_id}_notes")],
+            |r| r.get(0),
+        ).unwrap();
+        assert!(stored.contains("Line one"));
+        assert!(stored.contains("Line two"));
+    }
+
+    #[test]
+    fn append_note_fails_for_missing_job() {
+        let (conn, job_id, _) = fixture_db();
+        conn.execute(
+            "INSERT INTO pending_patches (id, job_id, patch_json, summary, created_at)
+             VALUES ('p_note_bad', ?1, '{}', 'note bad', 0)",
+            rusqlite::params![job_id],
+        ).unwrap();
+
+        let patch = Patch {
+            patch_version: 1,
+            summary: "bad job".into(),
+            ops: vec![PatchOp::AppendNote { job_id: 99999, text: "ghost note".into() }],
+        };
+
+        let result = apply_patch(&conn, "p_note_bad", &patch);
+        assert!(result.is_err());
+
+        let status: String = conn.query_row(
+            "SELECT status FROM pending_patches WHERE id = 'p_note_bad'",
+            [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(status, "apply_failed");
+    }
 }
