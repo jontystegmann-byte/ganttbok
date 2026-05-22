@@ -10,9 +10,10 @@ use rmcp::{
 };
 
 use crate::tools::read::{
-    GetJobParams, ListTasksParams, GetTaskParams,
+    GetJobParams, ListTasksParams, GetTaskParams, SearchParams, TodayParams,
     query_list_jobs, query_get_job,
     query_list_tasks, query_get_task, query_list_contacts,
+    query_search, query_today,
 };
 
 pub struct BlikPlanServer {
@@ -72,6 +73,27 @@ impl BlikPlanServer {
         let conn = self.db.lock().unwrap();
         match query_list_contacts(&conn) {
             Ok(contacts) => serde_json::to_string_pretty(&contacts).unwrap_or_else(|e| e.to_string()),
+            Err(e) => format!("{{\"error\":\"{e}\"}}"),
+        }
+    }
+
+    #[tool(description = "Free-text search across job names, phase names, task names, and task notes. Case-insensitive substring match.")]
+    async fn search(&self, Parameters(p): Parameters<SearchParams>) -> String {
+        if p.query.trim().is_empty() {
+            return "{\"error\":\"query must not be empty\"}".into();
+        }
+        let conn = self.db.lock().unwrap();
+        match query_search(&conn, &p.query) {
+            Ok(hits) => serde_json::to_string_pretty(&hits).unwrap_or_else(|e| e.to_string()),
+            Err(e) => format!("{{\"error\":\"{e}\"}}"),
+        }
+    }
+
+    #[tool(description = "What is overdue, in-progress, or starting today. Optionally filter to a single job_id.")]
+    async fn today(&self, Parameters(p): Parameters<TodayParams>) -> String {
+        let conn = self.db.lock().unwrap();
+        match query_today(&conn, p.job_id) {
+            Ok(items) => serde_json::to_string_pretty(&items).unwrap_or_else(|e| e.to_string()),
             Err(e) => format!("{{\"error\":\"{e}\"}}"),
         }
     }

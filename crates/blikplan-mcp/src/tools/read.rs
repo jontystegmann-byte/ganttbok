@@ -1,6 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use rusqlite::Connection;
+use chrono::NaiveDate;
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Shared output types
@@ -229,4 +230,156 @@ pub fn query_list_contacts(conn: &Connection) -> Result<Vec<ContactSummary>, Str
         notes: r.get(3)?,
     })).map_err(|e| e.to_string())?;
     rows.map(|r| r.map_err(|e| e.to_string())).collect()
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Search output type and params
+// ──────────────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize)]
+pub struct SearchHit {
+    pub kind: String,       // "job" | "phase" | "task"
+    pub id: i64,
+    pub name: String,
+    pub snippet: String,    // the matching field value
+}
+
+#[derive(Debug, Deserialize, JsonSchema, Default)]
+pub struct SearchParams {
+    /// Free-text query. Case-insensitive substring match across job names,
+    /// phase names, task names, and task notes.
+    pub query: String,
+}
+
+pub fn query_search(conn: &Connection, q: &str) -> Result<Vec<SearchHit>, String> {
+    let pattern = format!("%{}%", q.to_lowercase());
+    let mut hits: Vec<SearchHit> = Vec::new();
+
+    // Job names
+    let mut s = conn.prepare(
+        "SELECT id, name FROM job WHERE lower(name) LIKE ?1 AND archived = 0"
+    ).map_err(|e| e.to_string())?;
+    let rows = s.query_map([&pattern], |r| {
+        Ok(SearchHit { kind: "job".into(), id: r.get(0)?, name: r.get(1)?, snippet: r.get(1)? })
+    }).map_err(|e| e.to_string())?;
+    for r in rows { hits.push(r.map_err(|e| e.to_string())?); }
+
+    // Phase names and notes
+    let mut s = conn.prepare(
+        "SELECT p.id, p.name, p.notes FROM phase p
+         JOIN job j ON j.id = p.job_id
+         WHERE j.archived = 0 AND (lower(p.name) LIKE ?1 OR lower(coalesce(p.notes,'')) LIKE ?1)"
+    ).map_err(|e| e.to_string())?;
+    let rows = s.query_map([&pattern], |r| {
+        let pname: String = r.get(1)?;
+        let pnotes: String = r.get(2)?;
+        let snippet = if pname.to_lowercase().contains(&q.to_lowercase()) { pname.clone() } else { pnotes };
+        Ok(SearchHit { kind: "phase".into(), id: r.get(0)?, name: pname, snippet })
+    }).map_err(|e| e.to_string())?;
+    for r in rows { hits.push(r.map_err(|e| e.to_string())?); }
+
+    // Task names and notes
+    let mut s = conn.prepare(
+        "SELECT t.id, t.name, t.notes FROM task t
+         JOIN phase p ON p.id = t.phase_id
+         JOIN job j ON j.id = p.job_id
+         WHERE j.archived = 0
+           AND (lower(t.name) LIKE ?1 OR lower(coalesce(t.notes,'')) LIKE ?1)"
+    ).map_err(|e| e.to_string())?;
+    let rows = s.query_map([&pattern], |r| {
+        let tname: String = r.get(1)?;
+        let tnotes: Option<String> = r.get(2)?;
+        let snippet = if tname.to_lowercase().contains(&q.to_lowercase()) {
+            tname.clone()
+        } else {
+            tnotes.unwrap_or_default()
+        };
+        Ok(SearchHit { kind: "task".into(), id: r.get(0)?, name: tname, snippet })
+    }).map_err(|e| e.to_string())?;
+    for r in rows { hits.push(r.map_err(|e| e.to_string())?); }
+
+    Ok(hits)
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Today output type and params
+// ──────────────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize)]
+pub struct TodayItem {
+    pub status: String,     // "overdue" | "in_progress" | "due_today"
+    pub task_id: i64,
+    pub task_name: String,
+    pub job_id: i64,
+    pub job_name: String,
+    pub start_date: String,
+    pub end_date: String,   // inclusive last workday (start_date + duration_workdays - 1 calendar days, simplified)
+}
+
+#[derive(Debug, Deserialize, JsonSchema, Default)]
+pub struct TodayParams {
+    /// Restrict results to a single job when provided.
+    pub job_id: Option<i64>,
+}
+
+pub fn query_today(conn: &Connection, job_id: Option<i64>) -> Result<Vec<TodayItem>, String> {
+    // Filtering is done in Rust; SQL just fetches candidates from non-archived jobs.
+    let today = chrono::Local::now().date_naive().to_string();
+
+    let base_sql = "SELECT t.id, t.name, t.start_date, t.duration_workdays,
+                           j.id AS job_id, j.name AS job_name
+                    FROM task t
+                    JOIN phase p ON p.id = t.phase_id
+                    JOIN job j ON j.id = p.job_id
+                    WHERE j.archived = 0 AND j.is_template = 0";
+
+    let filter = if job_id.is_some() { " AND j.id = ?1" } else { "" };
+    let sql = format!("{base_sql}{filter} ORDER BY t.start_date");
+
+    let row_fn = |r: &rusqlite::Row| -> rusqlite::Result<(i64, String, String, i64, i64, String)> {
+        Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?))
+    };
+
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let raw: Vec<(i64, String, String, i64, i64, String)> = if let Some(jid) = job_id {
+        stmt.query_map([jid], row_fn)
+    } else {
+        stmt.query_map([], row_fn)
+    }.map_err(|e| e.to_string())?
+    .map(|r| r.map_err(|e| e.to_string()))
+    .collect::<Result<Vec<_>, _>>()?;
+
+    let today_d = NaiveDate::parse_from_str(&today, "%Y-%m-%d").unwrap();
+
+    let mut items = Vec::new();
+    for (tid, tname, start_str, dur, jid, jname) in raw {
+        let start = match NaiveDate::parse_from_str(&start_str, "%Y-%m-%d") {
+            Ok(d) => d,
+            Err(_) => continue,
+        };
+        // Approximate end: add (duration_workdays - 1) calendar days.
+        let end = start + chrono::Duration::days(dur.saturating_sub(1));
+        let end_str = end.to_string();
+
+        let status = if end < today_d {
+            "overdue"
+        } else if start == today_d {
+            "due_today"
+        } else if start <= today_d && end >= today_d {
+            "in_progress"
+        } else {
+            continue // future task, not relevant to "today"
+        };
+
+        items.push(TodayItem {
+            status: status.into(),
+            task_id: tid,
+            task_name: tname,
+            job_id: jid,
+            job_name: jname,
+            start_date: start_str,
+            end_date: end_str,
+        });
+    }
+    Ok(items)
 }

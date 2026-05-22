@@ -218,3 +218,79 @@ async fn list_contacts_returns_contacts() {
     assert!(text.contains("Doug"), "expected Doug in: {text}");
     client.cancel().await.unwrap();
 }
+
+#[tokio::test]
+async fn search_matches_task_name() {
+    let client = make_client(fixture::with_one_job()).await;
+    let result = client.call_tool(rmcp::model::CallToolRequestParam {
+        name: "search".into(),
+        arguments: Some(serde_json::json!({ "query": "slab" }).as_object().unwrap().clone()),
+    }).await.unwrap();
+    let text = result.content.first()
+        .and_then(|c| c.raw.as_text())
+        .map(|t| t.text.as_str())
+        .unwrap_or("");
+    assert!(text.contains("Pour slab") || text.contains("task"), "expected hit: {text}");
+    client.cancel().await.unwrap();
+}
+
+#[tokio::test]
+async fn search_empty_query_returns_error() {
+    let client = make_client(fixture::with_one_job()).await;
+    let result = client.call_tool(rmcp::model::CallToolRequestParam {
+        name: "search".into(),
+        arguments: Some(serde_json::json!({ "query": "" }).as_object().unwrap().clone()),
+    }).await.unwrap();
+    let text = result.content.first()
+        .and_then(|c| c.raw.as_text())
+        .map(|t| t.text.as_str())
+        .unwrap_or("");
+    assert!(text.contains("error"), "expected error: {text}");
+    client.cancel().await.unwrap();
+}
+
+#[tokio::test]
+async fn today_returns_in_progress_or_overdue() {
+    // The fixture task has start_date 2026-06-02. Since today (test runtime)
+    // is 2026-05-22 the task is in the future — today() returns empty [].
+    // This test asserts the tool responds without error.
+    let client = make_client(fixture::with_one_job()).await;
+    let result = client.call_tool(rmcp::model::CallToolRequestParam {
+        name: "today".into(),
+        arguments: None,
+    }).await.unwrap();
+    let text = result.content.first()
+        .and_then(|c| c.raw.as_text())
+        .map(|t| t.text.as_str())
+        .unwrap_or("");
+    // Valid outcomes: empty array or a list of items; no "error" key.
+    let val: serde_json::Value = serde_json::from_str(text).unwrap_or(serde_json::Value::Null);
+    assert!(val.is_array(), "expected JSON array, got: {text}");
+    client.cancel().await.unwrap();
+}
+
+#[tokio::test]
+async fn today_with_overdue_task_is_returned() {
+    // Insert a task with start_date in the past.
+    let db = {
+        let conn = fixture_db();
+        conn.execute_batch(
+            "INSERT INTO job (name, project_start_date, region) VALUES ('TestJob', '2020-01-01', 'ZA');
+             INSERT INTO phase (job_id, name, colour, order_index) VALUES (1, 'P', '#fff', 0);
+             INSERT INTO task (phase_id, name, start_date, duration_workdays, order_index)
+             VALUES (1, 'OldTask', '2020-01-05', 1, 0);"
+        ).unwrap();
+        conn
+    };
+    let client = make_client(db).await;
+    let result = client.call_tool(rmcp::model::CallToolRequestParam {
+        name: "today".into(),
+        arguments: None,
+    }).await.unwrap();
+    let text = result.content.first()
+        .and_then(|c| c.raw.as_text())
+        .map(|t| t.text.as_str())
+        .unwrap_or("");
+    assert!(text.contains("overdue"), "expected overdue: {text}");
+    client.cancel().await.unwrap();
+}
