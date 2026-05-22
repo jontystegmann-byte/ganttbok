@@ -313,4 +313,109 @@ mod tests {
         ).unwrap();
         assert_eq!(status, "applied");
     }
+
+    #[test]
+    fn add_task_inserts_row_and_resolves_op_ref() {
+        let (conn, job_id, phase_id) = fixture_db();
+        conn.execute(
+            "INSERT INTO pending_patches (id, job_id, patch_json, summary, created_at)
+             VALUES ('p_add', ?1, '{}', 'add', 0)",
+            rusqlite::params![job_id],
+        ).unwrap();
+
+        let patch = Patch {
+            patch_version: 1,
+            summary: "add a task".into(),
+            ops: vec![
+                PatchOp::AddTask {
+                    phase_id,
+                    name: "Order vent ducting".into(),
+                    start_date: "2026-06-08".into(),
+                    duration_workdays: 3,
+                    notes: Some("from Doug".into()),
+                    contact_id: None,
+                    op_ref: Some("vent_task".into()),
+                },
+            ],
+        };
+
+        apply_patch(&conn, "p_add", &patch).unwrap();
+
+        let tasks = crate::repo::task::list_for_phase(&conn, phase_id).unwrap();
+        assert_eq!(tasks.len(), 1);
+        assert_eq!(tasks[0].name, "Order vent ducting");
+        assert_eq!(tasks[0].duration_workdays, 3);
+        assert_eq!(tasks[0].notes.as_deref(), Some("from Doug"));
+    }
+
+    #[test]
+    fn add_task_assigns_contact_when_contact_id_supplied() {
+        let (conn, job_id, phase_id) = fixture_db();
+        // Create a contact to assign.
+        let contact = crate::repo::contact::create(&conn, &crate::db::models::NewContact {
+            name: "Doug".into(),
+            telegram_chat_id: None,
+            telegram_handle: None,
+            notes: "supplier".into(),
+        }).unwrap();
+
+        conn.execute(
+            "INSERT INTO pending_patches (id, job_id, patch_json, summary, created_at)
+             VALUES ('p_contact', ?1, '{}', 'contact', 0)",
+            rusqlite::params![job_id],
+        ).unwrap();
+
+        let patch = Patch {
+            patch_version: 1,
+            summary: "add task with contact".into(),
+            ops: vec![PatchOp::AddTask {
+                phase_id,
+                name: "Call Doug".into(),
+                start_date: "2026-06-08".into(),
+                duration_workdays: 1,
+                notes: None,
+                contact_id: Some(contact.id),
+                op_ref: None,
+            }],
+        };
+
+        apply_patch(&conn, "p_contact", &patch).unwrap();
+
+        let tasks = crate::repo::task::list_for_phase(&conn, phase_id).unwrap();
+        assert_eq!(tasks[0].contact_id, Some(contact.id));
+    }
+
+    #[test]
+    fn add_task_fails_when_phase_does_not_exist() {
+        let (conn, job_id, _phase_id) = fixture_db();
+        conn.execute(
+            "INSERT INTO pending_patches (id, job_id, patch_json, summary, created_at)
+             VALUES ('p_bad_phase', ?1, '{}', 'bad', 0)",
+            rusqlite::params![job_id],
+        ).unwrap();
+
+        let patch = Patch {
+            patch_version: 1,
+            summary: "bad phase".into(),
+            ops: vec![PatchOp::AddTask {
+                phase_id: 99999,
+                name: "Ghost task".into(),
+                start_date: "2026-06-08".into(),
+                duration_workdays: 1,
+                notes: None,
+                contact_id: None,
+                op_ref: None,
+            }],
+        };
+
+        let result = apply_patch(&conn, "p_bad_phase", &patch);
+        assert!(result.is_err());
+
+        // Row should be apply_failed.
+        let status: String = conn.query_row(
+            "SELECT status FROM pending_patches WHERE id = 'p_bad_phase'",
+            [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(status, "apply_failed");
+    }
 }
