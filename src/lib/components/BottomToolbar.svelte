@@ -7,6 +7,7 @@
   import { store } from '../store.svelte';
   import * as ipc from '../ipc';
   import InboxPanel from './InboxPanel.svelte';
+  import ConnectToClaude from './ConnectToClaude.svelte';
 
   /* ---------- Update checker ---------- */
   type UpdPhase = 'idle' | 'checking' | 'no-update' | 'available' | 'downloading' | 'installed' | 'error';
@@ -353,6 +354,10 @@
         </p>
       </section>
     {/if}
+
+    <section>
+      <ConnectToClaude />
+    </section>
   </div>
 {/if}
 

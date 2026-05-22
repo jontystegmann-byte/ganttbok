@@ -1,4 +1,11 @@
-Blik Plan v1.6.0-beta — Claude connector
+Blik Plan v1.6.0-beta.1 — Claude connector
+
+FIX (v1.6.0-beta.1)
+- The "Connect to Claude (beta)" section is now actually mounted in the Settings popover. In v1.6.0-beta it was wired into an orphan component that the app never rendered, so the button never appeared.
+
+—
+
+v1.6.0-beta — Claude connector
 
 NEW
 - **Connect to Claude (beta)**. Settings → bottom of the popover. One-click button merges a `blikplan` MCP server entry into Claude Code (`~/.claude.json`) and Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json`). Backups of the previous config are written to `<path>.bak-<timestamp>` before any change. Disconnect button reverses the merge cleanly, leaving sibling MCP servers untouched.

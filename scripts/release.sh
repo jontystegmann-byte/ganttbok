@@ -53,16 +53,41 @@ build_target aarch64-apple-darwin
 assets_dir="$(mktemp -d)"
 echo "==> Collecting artifacts into $assets_dir"
 
+# Resolve the actual cargo target dir (may be redirected by .cargo/config.toml).
+TARGET_DIR="$(cargo metadata --format-version 1 --no-deps 2>/dev/null \
+  | grep -o '"target_directory":"[^"]*' | head -1 | sed 's/"target_directory":"//')"
+if [ -z "$TARGET_DIR" ]; then
+  echo "❌ Could not resolve cargo target directory via 'cargo metadata'"
+  exit 1
+fi
+echo "==> cargo target_directory: $TARGET_DIR"
+
 # collect() takes triple + a human-friendly slug used in the output filenames.
 # The Tauri updater's platform keys (darwin-x86_64 / darwin-aarch64) are hard-coded
 # in latest.json below — those must stay exact.
 collect() {
   local TRIPLE="$1"
   local SLUG="$2"
-  local BUNDLE_DIR="src-tauri/target/$TRIPLE/release/bundle"
-  local TAR_SRC=$(ls "$BUNDLE_DIR/macos/"*.app.tar.gz | head -1)
+  local BUNDLE_DIR="$TARGET_DIR/$TRIPLE/release/bundle"
+  shopt -s nullglob
+  local TARS=("$BUNDLE_DIR/macos/"*.app.tar.gz)
+  local DMGS=("$BUNDLE_DIR/dmg/"*.dmg)
+  shopt -u nullglob
+  if [ ${#TARS[@]} -eq 0 ]; then
+    echo "❌ No .app.tar.gz found in $BUNDLE_DIR/macos/"
+    exit 1
+  fi
+  if [ ${#DMGS[@]} -eq 0 ]; then
+    echo "❌ No .dmg found in $BUNDLE_DIR/dmg/"
+    exit 1
+  fi
+  local TAR_SRC="${TARS[0]}"
+  local DMG_SRC="${DMGS[0]}"
   local SIG_SRC="${TAR_SRC}.sig"
-  local DMG_SRC=$(ls "$BUNDLE_DIR/dmg/"*.dmg | head -1)
+  if [ ! -f "$SIG_SRC" ]; then
+    echo "❌ Missing signature: $SIG_SRC (is TAURI_SIGNING_PRIVATE_KEY set during the build?)"
+    exit 1
+  fi
   local DMG_OUT="$assets_dir/Blik_Plan_${VERSION}_${SLUG}.dmg"
   local TAR_OUT="$assets_dir/Blik_Plan_${VERSION}_${SLUG}.app.tar.gz"
   cp "$DMG_SRC" "$DMG_OUT"

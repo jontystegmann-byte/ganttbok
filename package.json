@@ -1,14 +1,14 @@
 {
   "name": "ganttbok",
   "private": true,
-  "version": "1.6.0-beta",
+  "version": "1.6.0-beta.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
-    "build:mcp-sidecar": "cargo build --release -p blikplan-mcp && ./scripts/copy-mcp-sidecar.sh",
+    "build:mcp-sidecar": "cargo build --release -p blikplan-mcp --target x86_64-apple-darwin --target aarch64-apple-darwin && mkdir -p src-tauri/binaries && cp target/x86_64-apple-darwin/release/blikplan-mcp src-tauri/binaries/blikplan-mcp-x86_64-apple-darwin && cp target/aarch64-apple-darwin/release/blikplan-mcp src-tauri/binaries/blikplan-mcp-aarch64-apple-darwin",
     "tauri": "tauri"
   },
   "dependencies": {
