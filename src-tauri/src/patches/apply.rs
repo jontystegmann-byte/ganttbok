@@ -849,4 +849,59 @@ mod tests {
         ).unwrap();
         assert!(note.contains("Graham"));
     }
+
+    #[test]
+    fn failed_op_rolls_back_all_preceding_ops() {
+        let (conn, job_id, phase_id) = fixture_db();
+        conn.execute(
+            "INSERT INTO pending_patches (id, job_id, patch_json, summary, created_at)
+             VALUES ('p_rollback', ?1, '{}', 'should rollback', 0)",
+            rusqlite::params![job_id],
+        ).unwrap();
+
+        let patch = Patch {
+            patch_version: 1,
+            summary: "first op ok, second op bad".into(),
+            ops: vec![
+                // Op 1: valid — adds a new task.
+                PatchOp::AddTask {
+                    phase_id,
+                    name: "Should be rolled back".into(),
+                    start_date: "2026-06-08".into(),
+                    duration_workdays: 1,
+                    notes: None,
+                    contact_id: None,
+                    op_ref: None,
+                },
+                // Op 2: invalid — references a phase that does not exist.
+                PatchOp::AddTask {
+                    phase_id: 99999,
+                    name: "Bad phase task".into(),
+                    start_date: "2026-06-08".into(),
+                    duration_workdays: 1,
+                    notes: None,
+                    contact_id: None,
+                    op_ref: None,
+                },
+            ],
+        };
+
+        let result = apply_patch(&conn, "p_rollback", &patch);
+        assert!(result.is_err());
+
+        // Op 1 must have been rolled back — zero tasks in the phase.
+        let tasks = crate::repo::task::list_for_phase(&conn, phase_id).unwrap();
+        assert_eq!(tasks.len(), 0, "rollback failed — task from op 1 survived");
+
+        // Row must be apply_failed.
+        let (status, error): (String, Option<String>) = conn.query_row(
+            "SELECT status, error FROM pending_patches WHERE id = 'p_rollback'",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        ).unwrap();
+        assert_eq!(status, "apply_failed");
+        assert!(error.is_some(), "error column should be populated");
+        assert!(error.unwrap().contains("phase 99999"),
+            "error message should mention the missing phase");
+    }
 }
