@@ -749,4 +749,104 @@ mod tests {
         ).unwrap();
         assert_eq!(status, "apply_failed");
     }
+
+    #[test]
+    fn full_patch_with_all_five_op_types() {
+        let (conn, job_id, phase_id) = fixture_db();
+
+        // Pre-create a task that shift_task and add_dependency will target.
+        let existing_task = crate::repo::task::create(&conn, &crate::db::models::NewTask {
+            phase_id, name: "Order windows".into(),
+            start_date: NaiveDate::from_ymd_opt(2026, 6, 8).unwrap(),
+            duration_workdays: 5, order_index: 0, notes: None,
+        }).unwrap();
+        let contact = crate::repo::contact::create(&conn, &crate::db::models::NewContact {
+            name: "Doug".into(),
+            telegram_chat_id: None, telegram_handle: None, notes: "".into(),
+        }).unwrap();
+
+        conn.execute(
+            "INSERT INTO pending_patches (id, job_id, patch_json, summary, created_at)
+             VALUES ('p_full', ?1, '{}', 'from site meeting', 0)",
+            rusqlite::params![job_id],
+        ).unwrap();
+
+        let patch = Patch {
+            patch_version: 1,
+            summary: "Site meeting 2026-05-22: 4 changes".into(),
+            ops: vec![
+                // 1. add_task — new task with op_ref
+                PatchOp::AddTask {
+                    phase_id,
+                    name: "Order vent ducting".into(),
+                    start_date: "2026-06-10".into(),
+                    duration_workdays: 2,
+                    notes: None,
+                    contact_id: Some(contact.id),
+                    op_ref: Some("vent".into()),
+                },
+                // 2. shift_task — existing task
+                PatchOp::ShiftTask {
+                    task_id: existing_task.id,
+                    by_days: 5,
+                },
+                // 3. add_dependency — new task depends on existing (via op_ref)
+                PatchOp::AddDependency {
+                    predecessor: crate::patches::schema::TaskRef::Existing { task_id: existing_task.id },
+                    successor: crate::patches::schema::TaskRef::Pending { op_ref: "vent".into() },
+                    dep_type: "FS".into(),
+                    lag_days: 0,
+                },
+                // 4. add_chaser — attach contact to existing task
+                PatchOp::AddChaser {
+                    task_id: existing_task.id,
+                    contact_id: contact.id,
+                    template: "approaching".into(),
+                },
+                // 5. append_note
+                PatchOp::AppendNote {
+                    job_id,
+                    text: "Graham wants fewer cavity walls — reopen Henry Fagan discussion".into(),
+                },
+            ],
+        };
+
+        apply_patch(&conn, "p_full", &patch).unwrap();
+
+        // Verify status.
+        let status: String = conn.query_row(
+            "SELECT status FROM pending_patches WHERE id = 'p_full'",
+            [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(status, "applied");
+
+        // Verify vent task was created.
+        let tasks = crate::repo::task::list_for_phase(&conn, phase_id).unwrap();
+        assert_eq!(tasks.len(), 2);
+        let vent = tasks.iter().find(|t| t.name == "Order vent ducting").unwrap();
+        assert_eq!(vent.contact_id, Some(contact.id));
+
+        // Verify windows were shifted.
+        let shifted = crate::repo::task::get(&conn, existing_task.id).unwrap();
+        assert!(shifted.start_date > existing_task.start_date);
+
+        // Verify dependency was created.
+        let deps = crate::repo::dependency::list_for_job(&conn, job_id).unwrap();
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0].predecessor_id, existing_task.id);
+        assert_eq!(deps[0].successor_id, vent.id);
+
+        // Verify chaser contact assigned.
+        let windows_updated = crate::repo::task::get(&conn, existing_task.id).unwrap();
+        assert_eq!(windows_updated.contact_id, Some(contact.id));
+
+        // Verify note was stored.
+        let note_key = format!("job_{job_id}_notes");
+        let note: String = conn.query_row(
+            "SELECT value FROM app_meta WHERE key = ?1",
+            rusqlite::params![note_key],
+            |r| r.get(0),
+        ).unwrap();
+        assert!(note.contains("Graham"));
+    }
 }
