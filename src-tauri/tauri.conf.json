@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "pnpm build",
+    "beforeBuildCommand": "pnpm build:mcp-sidecar && pnpm build",
     "frontendDist": "../dist"
   },
   "app": {
@@ -30,6 +30,7 @@
     "active": true,
     "createUpdaterArtifacts": true,
     "targets": ["app", "dmg"],
+    "externalBin": ["binaries/blikplan-mcp"],
     "category": "Productivity",
     "shortDescription": "Gantt-chart project planning for builders and creators",
     "longDescription": "Blik Plan — plan, edit, and print A3 Gantt charts for any project. Mon-Fri (or 7-day) workdays, public holidays auto-synced for South Africa, USA, UK, India and China. Week-numbered timeline, magnetic-snap drag with hard-chain dependency ripple, per-job notes panel.",

@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
+    "build:mcp-sidecar": "cargo build --release -p blikplan-mcp && ./scripts/copy-mcp-sidecar.sh",
     "tauri": "tauri"
   },
   "dependencies": {
