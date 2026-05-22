@@ -4,9 +4,12 @@ use rusqlite::Connection;
 use rmcp::{
     ServerHandler,
     handler::server::tool::ToolRouter,
+    handler::server::tool::Parameters,
     model::{Implementation, ServerCapabilities, ServerInfo},
     tool, tool_handler, tool_router,
 };
+
+use crate::tools::read::{GetJobParams, query_list_jobs, query_get_job};
 
 pub struct BlikPlanServer {
     pub(crate) db: Arc<Mutex<Connection>>,
@@ -24,12 +27,22 @@ impl BlikPlanServer {
 
 #[tool_router]
 impl BlikPlanServer {
-    // Tools are added as Tasks 4–10 progress.
-    // A placeholder is needed so the macro emits a valid (empty) router.
-    // Remove this placeholder once Task 4 adds the first real tool.
-    #[tool(description = "_placeholder — remove after Task 4_")]
-    async fn placeholder(&self) -> String {
-        "placeholder".into()
+    #[tool(description = "List all active jobs (projects). Returns id, name, client, start date, region.")]
+    async fn list_jobs(&self) -> String {
+        let conn = self.db.lock().unwrap();
+        match query_list_jobs(&conn) {
+            Ok(jobs) => serde_json::to_string_pretty(&jobs).unwrap_or_else(|e| e.to_string()),
+            Err(e) => format!("{{\"error\":\"{e}\"}}"),
+        }
+    }
+
+    #[tool(description = "Get a full job by id: all phases, tasks, dependencies.")]
+    async fn get_job(&self, Parameters(p): Parameters<GetJobParams>) -> String {
+        let conn = self.db.lock().unwrap();
+        match query_get_job(&conn, p.job_id) {
+            Ok(job) => serde_json::to_string_pretty(&job).unwrap_or_else(|e| e.to_string()),
+            Err(e) => format!("{{\"error\":\"not_found\",\"detail\":\"{e}\"}}"),
+        }
     }
 }
 
@@ -43,7 +56,7 @@ impl ServerHandler for BlikPlanServer {
             },
             capabilities: ServerCapabilities::builder().enable_tools().build(),
             instructions: Some(
-                "Read and propose patches to a Blik Plan schedule.".into(),
+                "Read and propose patches to a Blik Plan schedule. Use list_jobs first to discover job ids, then get_job for full context.".into(),
             ),
             ..Default::default()
         }
