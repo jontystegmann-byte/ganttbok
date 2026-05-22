@@ -143,3 +143,77 @@ export interface DragTaskArgs {
   task_id: number;
   new_start_date: string;
 }
+
+// ---------------------------------------------------------------
+// Patch schema — shared with the MCP server and the Inbox panel.
+// Source of truth: src-tauri/src/patches/schema.rs (PATCH_VERSION = 1).
+// Keep these two definitions in sync; any change here needs a
+// matching change there.
+// ---------------------------------------------------------------
+
+export const PATCH_VERSION = 1;
+
+export type TaskRef =
+  | { task_id: number }
+  | { op_ref: string };
+
+export type PatchOp =
+  | {
+      op: 'add_task';
+      phase_id: number;
+      name: string;
+      start_date: string;          // YYYY-MM-DD
+      duration_workdays: number;
+      notes?: string;
+      contact_id?: number;
+      op_ref?: string;
+    }
+  | {
+      op: 'shift_task';
+      task_id: number;
+      by_days: number;
+    }
+  | {
+      op: 'add_dependency';
+      predecessor: TaskRef;
+      successor: TaskRef;
+      dep_type?: 'FS' | 'SS' | 'FF' | 'SF';   // default FS
+      lag_days?: number;
+    }
+  | {
+      op: 'add_chaser';
+      task_id: number;
+      contact_id: number;
+      template: string;
+    }
+  | {
+      op: 'append_note';
+      job_id: number;
+      text: string;
+    };
+
+export interface Patch {
+  patch_version: number;
+  summary: string;
+  ops: PatchOp[];
+}
+
+export type PatchStatus =
+  | 'proposed'
+  | 'accepted'
+  | 'applied'
+  | 'rejected'
+  | 'apply_failed'
+  | 'expired';
+
+export interface PendingPatch {
+  id: string;
+  job_id: number;
+  patch: Patch;            // parsed from patch_json at the IPC boundary
+  summary: string;
+  source: string;          // 'mcp' for v1
+  status: PatchStatus;
+  created_at: number;      // unix seconds
+  resolved_at: number | null;
+  error: string | null;
+}
