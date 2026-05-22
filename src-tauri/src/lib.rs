@@ -91,6 +91,10 @@ pub fn run() {
             commands::chaser::test_telegram,
             commands::chaser::run_chaser_check,
             commands::sync::resync_job_state,
+            commands::patches::list_pending_patches,
+            commands::patches::get_pending_patch,
+            commands::patches::accept_patch,
+            commands::patches::reject_patch,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {

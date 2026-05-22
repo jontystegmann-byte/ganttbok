@@ -11,6 +11,7 @@ pub mod no_work_day;
 pub mod meta;
 pub mod sync;
 pub mod chaser;
+pub mod patches;
 
 /// Wraps the singleton SQLite connection in a Mutex so Tauri can pass it
 /// to command handlers as `tauri::State<Db>`.
