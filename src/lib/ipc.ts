@@ -4,6 +4,7 @@ import type {
   CreateJobArgs, CreatePhaseArgs, CreateTaskArgs, CreateDepArgs,
   AddManualArgs, SyncSaArgs, InstantiateArgs, DragTaskArgs,
   Contact, NudgeResult,
+  PendingPatch,
 } from './types';
 
 // Jobs
@@ -90,3 +91,22 @@ export interface ResyncArgs {
   no_work_days: NoWorkDay[];
 }
 export const resyncJobState = (args: ResyncArgs) => invoke<void>('resync_job_state', { args });
+
+// Inbox / Patches
+export const listPendingPatches = (statusFilter?: string) =>
+  invoke<PendingPatch[]>('list_pending_patches', { statusFilter: statusFilter ?? null });
+
+export const getPendingPatch = (id: string) =>
+  invoke<PendingPatch>('get_pending_patch', { id });
+
+export const acceptPatch = (id: string) =>
+  invoke<void>('accept_patch', { id });
+
+export const rejectPatch = (id: string) =>
+  invoke<void>('reject_patch', { id });
+
+export const clearResolvedPatches = () =>
+  invoke<number>('clear_resolved_patches');
+
+export const expireStalePatches = () =>
+  invoke<number>('expire_stale_patches');

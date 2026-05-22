@@ -1,5 +1,5 @@
 import * as ipc from './ipc';
-import type { Job, Phase, Task, Dependency, NoWorkDay, Contact } from './types';
+import type { Job, Phase, Task, Dependency, NoWorkDay, Contact, PendingPatch } from './types';
 import type { Zone } from './hit-test';
 import { UndoStack, type Snapshot as UndoSnapshot } from './undo';
 
@@ -57,6 +57,11 @@ class Store {
   // Chaser
   contacts = $state<Contact[]>([]);
   showContactsPage = $state<boolean>(false);
+
+  // Inbox — proposed patches from MCP / external sources
+  inboxPatches    = $state<PendingPatch[]>([]);
+  inboxOpen       = $state<boolean>(false);
+  private inboxPollTimer: number | null = null;
 
   async toggleDurationUnit(): Promise<void> {
     this.durationUnit = this.durationUnit === 'weeks' ? 'days' : 'weeks';
@@ -121,6 +126,51 @@ class Store {
     } catch (e) {
       console.warn('chaser check failed', e);
     }
+  }
+
+  /** Poll interval for the Inbox. 5 seconds while the window is open. */
+  static readonly INBOX_POLL_MS = 5000;
+
+  async refreshInbox(): Promise<void> {
+    try {
+      this.inboxPatches = await ipc.listPendingPatches('proposed');
+    } catch (e) {
+      console.warn('inbox refresh failed', e);
+    }
+  }
+
+  startInboxPoll(): void {
+    if (this.inboxPollTimer !== null) return;
+    this.inboxPollTimer = window.setInterval(
+      () => this.refreshInbox(),
+      Store.INBOX_POLL_MS,
+    );
+  }
+
+  stopInboxPoll(): void {
+    if (this.inboxPollTimer !== null) {
+      clearInterval(this.inboxPollTimer);
+      this.inboxPollTimer = null;
+    }
+  }
+
+  async acceptInboxPatch(id: string): Promise<void> {
+    await ipc.acceptPatch(id);
+    await this.refreshInbox();
+    // Re-load the current job to reflect the applied changes.
+    if (this.currentJob) {
+      await this.openJob(this.currentJob.id);
+    }
+  }
+
+  async rejectInboxPatch(id: string): Promise<void> {
+    await ipc.rejectPatch(id);
+    await this.refreshInbox();
+  }
+
+  async clearResolvedPatches(): Promise<void> {
+    await ipc.clearResolvedPatches();
+    await this.refreshInbox();
   }
 
   async setCurrentJobRegion(region: string): Promise<void> {
@@ -337,6 +387,11 @@ class Store {
         this.runChaserCheck();
       }
     });
+
+    // Inbox: initial fetch + 5-second poll + refresh on focus.
+    await this.refreshInbox();
+    this.startInboxPoll();
+    window.addEventListener('focus', () => this.refreshInbox());
   }
 
   async refreshSidebar(): Promise<void> {
