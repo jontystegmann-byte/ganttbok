@@ -418,4 +418,61 @@ mod tests {
         ).unwrap();
         assert_eq!(status, "apply_failed");
     }
+
+    #[test]
+    fn shift_task_moves_start_date_by_workdays() {
+        let (conn, job_id, phase_id) = fixture_db();
+        let t = crate::repo::task::create(&conn, &crate::db::models::NewTask {
+            phase_id,
+            name: "Order windows".into(),
+            start_date: NaiveDate::from_ymd_opt(2026, 6, 8).unwrap(),
+            duration_workdays: 5,
+            order_index: 0,
+            notes: None,
+        }).unwrap();
+
+        conn.execute(
+            "INSERT INTO pending_patches (id, job_id, patch_json, summary, created_at)
+             VALUES ('p_shift', ?1, '{}', 'shift', 0)",
+            rusqlite::params![job_id],
+        ).unwrap();
+
+        let patch = Patch {
+            patch_version: 1,
+            summary: "shift windows by +7 workdays".into(),
+            ops: vec![PatchOp::ShiftTask { task_id: t.id, by_days: 7 }],
+        };
+
+        apply_patch(&conn, "p_shift", &patch).unwrap();
+
+        let updated = crate::repo::task::get(&conn, t.id).unwrap();
+        // 2026-06-08 (Monday) + 7 workdays = 2026-06-17 (Wednesday).
+        // (8,9,10,11,12 = Mon–Fri; 15,16,17 = Mon-Wed; 7 workdays forward)
+        assert_eq!(updated.start_date, NaiveDate::from_ymd_opt(2026, 6, 17).unwrap());
+    }
+
+    #[test]
+    fn shift_task_fails_when_task_does_not_exist() {
+        let (conn, job_id, _phase_id) = fixture_db();
+        conn.execute(
+            "INSERT INTO pending_patches (id, job_id, patch_json, summary, created_at)
+             VALUES ('p_shift_bad', ?1, '{}', 'shift bad', 0)",
+            rusqlite::params![job_id],
+        ).unwrap();
+
+        let patch = Patch {
+            patch_version: 1,
+            summary: "shift missing task".into(),
+            ops: vec![PatchOp::ShiftTask { task_id: 99999, by_days: 1 }],
+        };
+
+        let result = apply_patch(&conn, "p_shift_bad", &patch);
+        assert!(result.is_err());
+
+        let status: String = conn.query_row(
+            "SELECT status FROM pending_patches WHERE id = 'p_shift_bad'",
+            [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(status, "apply_failed");
+    }
 }
