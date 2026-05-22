@@ -475,4 +475,135 @@ mod tests {
         ).unwrap();
         assert_eq!(status, "apply_failed");
     }
+
+    #[test]
+    fn add_dependency_between_existing_tasks() {
+        let (conn, job_id, phase_id) = fixture_db();
+        let t1 = crate::repo::task::create(&conn, &crate::db::models::NewTask {
+            phase_id, name: "T1".into(),
+            start_date: NaiveDate::from_ymd_opt(2026, 6, 8).unwrap(),
+            duration_workdays: 1, order_index: 0, notes: None,
+        }).unwrap();
+        let t2 = crate::repo::task::create(&conn, &crate::db::models::NewTask {
+            phase_id, name: "T2".into(),
+            start_date: NaiveDate::from_ymd_opt(2026, 6, 9).unwrap(),
+            duration_workdays: 1, order_index: 1, notes: None,
+        }).unwrap();
+
+        conn.execute(
+            "INSERT INTO pending_patches (id, job_id, patch_json, summary, created_at)
+             VALUES ('p_dep', ?1, '{}', 'dep', 0)",
+            rusqlite::params![job_id],
+        ).unwrap();
+
+        let patch = Patch {
+            patch_version: 1,
+            summary: "add dep".into(),
+            ops: vec![PatchOp::AddDependency {
+                predecessor: crate::patches::schema::TaskRef::Existing { task_id: t1.id },
+                successor: crate::patches::schema::TaskRef::Existing { task_id: t2.id },
+                dep_type: "FS".into(),
+                lag_days: 0,
+            }],
+        };
+
+        apply_patch(&conn, "p_dep", &patch).unwrap();
+
+        let deps = crate::repo::dependency::list_for_job(&conn, job_id).unwrap();
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0].predecessor_id, t1.id);
+        assert_eq!(deps[0].successor_id, t2.id);
+    }
+
+    #[test]
+    fn add_dependency_with_op_ref_predecessor() {
+        let (conn, job_id, phase_id) = fixture_db();
+        let existing = crate::repo::task::create(&conn, &crate::db::models::NewTask {
+            phase_id, name: "Existing".into(),
+            start_date: NaiveDate::from_ymd_opt(2026, 6, 8).unwrap(),
+            duration_workdays: 1, order_index: 0, notes: None,
+        }).unwrap();
+
+        conn.execute(
+            "INSERT INTO pending_patches (id, job_id, patch_json, summary, created_at)
+             VALUES ('p_dep_ref', ?1, '{}', 'dep+ref', 0)",
+            rusqlite::params![job_id],
+        ).unwrap();
+
+        let patch = Patch {
+            patch_version: 1,
+            summary: "add new task then dep to it".into(),
+            ops: vec![
+                PatchOp::AddTask {
+                    phase_id,
+                    name: "New task".into(),
+                    start_date: "2026-06-10".into(),
+                    duration_workdays: 1,
+                    notes: None,
+                    contact_id: None,
+                    op_ref: Some("new_t".into()),
+                },
+                PatchOp::AddDependency {
+                    predecessor: crate::patches::schema::TaskRef::Existing { task_id: existing.id },
+                    successor: crate::patches::schema::TaskRef::Pending { op_ref: "new_t".into() },
+                    dep_type: "FS".into(),
+                    lag_days: 0,
+                },
+            ],
+        };
+
+        apply_patch(&conn, "p_dep_ref", &patch).unwrap();
+
+        let deps = crate::repo::dependency::list_for_job(&conn, job_id).unwrap();
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0].predecessor_id, existing.id);
+        // The successor is the newly-inserted task — we just verify it's non-zero.
+        assert!(deps[0].successor_id > 0);
+    }
+
+    #[test]
+    fn add_dependency_cycle_rejected() {
+        let (conn, job_id, phase_id) = fixture_db();
+        let t1 = crate::repo::task::create(&conn, &crate::db::models::NewTask {
+            phase_id, name: "A".into(),
+            start_date: NaiveDate::from_ymd_opt(2026, 6, 8).unwrap(),
+            duration_workdays: 1, order_index: 0, notes: None,
+        }).unwrap();
+        let t2 = crate::repo::task::create(&conn, &crate::db::models::NewTask {
+            phase_id, name: "B".into(),
+            start_date: NaiveDate::from_ymd_opt(2026, 6, 9).unwrap(),
+            duration_workdays: 1, order_index: 1, notes: None,
+        }).unwrap();
+        // Pre-existing dep: t1 → t2.
+        crate::repo::dependency::create(&conn, &NewDependency {
+            predecessor_id: t1.id, successor_id: t2.id, lag_days: 0,
+        }).unwrap();
+
+        conn.execute(
+            "INSERT INTO pending_patches (id, job_id, patch_json, summary, created_at)
+             VALUES ('p_cycle', ?1, '{}', 'cycle', 0)",
+            rusqlite::params![job_id],
+        ).unwrap();
+
+        // Attempting t2 → t1 should cycle.
+        let patch = Patch {
+            patch_version: 1,
+            summary: "would cycle".into(),
+            ops: vec![PatchOp::AddDependency {
+                predecessor: crate::patches::schema::TaskRef::Existing { task_id: t2.id },
+                successor: crate::patches::schema::TaskRef::Existing { task_id: t1.id },
+                dep_type: "FS".into(),
+                lag_days: 0,
+            }],
+        };
+
+        let result = apply_patch(&conn, "p_cycle", &patch);
+        assert!(matches!(result, Err(crate::GbError::DependencyCycle(_, _))));
+
+        let status: String = conn.query_row(
+            "SELECT status FROM pending_patches WHERE id = 'p_cycle'",
+            [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(status, "apply_failed");
+    }
 }
