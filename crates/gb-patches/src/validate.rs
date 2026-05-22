@@ -2,7 +2,7 @@ use chrono::NaiveDate;
 use thiserror::Error;
 use std::collections::HashSet;
 
-use crate::patches::schema::{Patch, PatchOp, TaskRef, PATCH_VERSION};
+use crate::schema::{Patch, PatchOp, TaskRef, PATCH_VERSION};
 
 #[derive(Debug, Error)]
 pub enum ValidationError {
@@ -137,7 +137,7 @@ fn check_taskref(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::patches::schema::{Patch, PatchOp, TaskRef};
+    use crate::schema::{Patch, PatchOp, TaskRef};
 
     fn ok_patch() -> Patch {
         Patch {
