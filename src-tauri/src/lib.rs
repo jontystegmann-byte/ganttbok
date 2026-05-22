@@ -1,5 +1,6 @@
 pub mod calendar;
 pub mod chaser;
+pub mod claude_config;
 pub mod commands;
 pub mod db;
 pub mod deps;
