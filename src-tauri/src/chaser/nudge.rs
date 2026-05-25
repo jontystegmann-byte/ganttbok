@@ -9,7 +9,7 @@ use serde::Serialize;
 
 use crate::calendar::workday::add_workdays_excluding;
 use crate::chaser::{telegram, templates::{self, TemplateContext}};
-use crate::db::models::{meta_get, Task};
+use crate::db::models::{meta_get, Task, TaskStatus};
 use crate::repo::{contact as contact_repo, no_work_day as nwd_repo, task as task_repo};
 
 #[derive(Debug, Serialize, Clone)]
@@ -70,6 +70,7 @@ pub fn run_auto_nudges(conn: &Connection, today: NaiveDate) -> Vec<NudgeResult> 
             id: r.get(0)?, phase_id: r.get(1)?, name: r.get(2)?, start_date,
             duration_workdays: r.get(4)?, order_index: r.get(5)?, notes: r.get(6)?,
             contact_id: r.get(7)?, last_chaser_sent_at: r.get(8)?,
+            status: TaskStatus::default(), completion_date: None,
         };
         let job_id: i64 = r.get(9)?;
         Ok((task, job_id))

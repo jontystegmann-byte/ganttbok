@@ -113,6 +113,7 @@ mod tests {
             is_template: false,
             holidays_block_work: true,
             region: "ZA".into(),
+            auto_shift_dependents: true,
         }).unwrap();
 
         let p1 = phase_repo::create(&conn, &NewPhase { job_id: job.id, name: "P1".into(), colour: "#000".into(), order_index: 0, collapsed: false }).unwrap();

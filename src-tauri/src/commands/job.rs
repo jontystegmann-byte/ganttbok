@@ -54,6 +54,7 @@ pub fn create_job(db: State<Db>, args: CreateJobArgs) -> GbResult<Job> {
         project_start_date: args.project_start_date, is_template: args.is_template,
         holidays_block_work: args.holidays_block_work,
         region: args.region,
+        auto_shift_dependents: true,
     })
 }
 
@@ -75,6 +76,22 @@ pub fn delete_job(db: State<Db>, id: i64) -> GbResult<()> {
     job_repo::delete(&conn, id)
 }
 
+#[tauri::command]
+pub fn set_job_auto_shift(db: State<Db>, id: i64, enabled: bool) -> GbResult<()> {
+    let conn = db.0.lock().unwrap();
+    set_job_auto_shift_inner(&conn, id, enabled)
+}
+
+pub(crate) fn set_job_auto_shift_inner(
+    conn: &rusqlite::Connection,
+    id: i64,
+    enabled: bool,
+) -> GbResult<()> {
+    let mut job = crate::repo::job::get(conn, id)?;
+    job.auto_shift_dependents = enabled;
+    crate::repo::job::update(conn, &job)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -82,6 +99,34 @@ mod tests {
     use crate::commands::Db;
 
     fn fresh() -> Db { Db::new(open_in_memory().unwrap()) }
+
+    /// In-memory DB seeded with one job at id=1.
+    fn create_test_db() -> Db {
+        let db = fresh();
+        {
+            let conn = db.0.lock().unwrap();
+            job_repo::create(&conn, &NewJob {
+                name: "Test".into(), client: None, address: None,
+                project_start_date: NaiveDate::from_ymd_opt(2026,6,5).unwrap(),
+                is_template: false, holidays_block_work: true, region: "ZA".into(),
+                auto_shift_dependents: true,
+            }).unwrap();
+        }
+        db
+    }
+
+    #[test]
+    fn set_job_auto_shift_toggles_correctly() {
+        let db = create_test_db();
+
+        set_job_auto_shift_inner(&db.0.lock().unwrap(), 1, false).unwrap();
+        let job = crate::repo::job::get(&db.0.lock().unwrap(), 1).unwrap();
+        assert!(!job.auto_shift_dependents);
+
+        set_job_auto_shift_inner(&db.0.lock().unwrap(), 1, true).unwrap();
+        let job = crate::repo::job::get(&db.0.lock().unwrap(), 1).unwrap();
+        assert!(job.auto_shift_dependents);
+    }
 
     #[test]
     fn create_then_list() {
@@ -92,6 +137,7 @@ mod tests {
             name: "Sea Point".into(), client: None, address: None,
             project_start_date: NaiveDate::from_ymd_opt(2026,6,5).unwrap(),
             is_template: false, holidays_block_work: true, region: "ZA".into(),
+            auto_shift_dependents: true,
         }).unwrap();
         let active = job_repo::list_active(&conn).unwrap();
         assert_eq!(active.len(), 1);

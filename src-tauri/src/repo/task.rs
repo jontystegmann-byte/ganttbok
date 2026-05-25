@@ -1,9 +1,9 @@
 use rusqlite::{Connection, params};
 use chrono::NaiveDate;
-use crate::db::models::{Task, NewTask};
+use crate::db::models::{Task, NewTask, TaskStatus};
 use crate::{GbError, GbResult};
 
-const SELECT_COLS: &str = "id, phase_id, name, start_date, duration_workdays, order_index, notes, contact_id, last_chaser_sent_at";
+const SELECT_COLS: &str = "id, phase_id, name, start_date, duration_workdays, order_index, notes, contact_id, last_chaser_sent_at, status, completion_date";
 
 pub fn create(conn: &Connection, new: &NewTask) -> GbResult<Task> {
     conn.execute(
@@ -60,12 +60,15 @@ pub fn update(conn: &Connection, task: &Task) -> GbResult<()> {
     let n = conn.execute(
         "UPDATE task SET phase_id = ?1, name = ?2, start_date = ?3,
                          duration_workdays = ?4, order_index = ?5, notes = ?6,
-                         contact_id = ?7, last_chaser_sent_at = ?8
-         WHERE id = ?9",
+                         contact_id = ?7,
+                         status = ?8, completion_date = ?9
+         WHERE id = ?10",
         params![
-            task.phase_id, task.name, task.start_date.to_string(),
+            task.phase_id, task.name, task.start_date.format("%Y-%m-%d").to_string(),
             task.duration_workdays, task.order_index, task.notes,
-            task.contact_id, task.last_chaser_sent_at,
+            task.contact_id,
+            task.status.as_db_str(),
+            task.completion_date.map(|d| d.format("%Y-%m-%d").to_string()),
             task.id,
         ],
     )?;
@@ -106,6 +109,22 @@ fn row_to_task(r: &rusqlite::Row) -> rusqlite::Result<Task> {
     let date_str: String = r.get(3)?;
     let start_date = NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
         .map_err(|e| rusqlite::Error::FromSqlConversionFailure(3, rusqlite::types::Type::Text, Box::new(e)))?;
+
+    let status_str: String = r.get(9)?;
+    let status = TaskStatus::from_db_str(&status_str).map_err(|e| {
+        rusqlite::Error::FromSqlConversionFailure(
+            9,
+            rusqlite::types::Type::Text,
+            Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, e)),
+        )
+    })?;
+
+    let completion_date: Option<String> = r.get(10)?;
+    let completion_date = completion_date
+        .map(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d"))
+        .transpose()
+        .map_err(|e| rusqlite::Error::FromSqlConversionFailure(10, rusqlite::types::Type::Text, Box::new(e)))?;
+
     Ok(Task {
         id: r.get(0)?,
         phase_id: r.get(1)?,
@@ -116,5 +135,7 @@ fn row_to_task(r: &rusqlite::Row) -> rusqlite::Result<Task> {
         notes: r.get(6)?,
         contact_id: r.get(7)?,
         last_chaser_sent_at: r.get(8)?,
+        status,
+        completion_date,
     })
 }

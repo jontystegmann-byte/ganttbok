@@ -1,6 +1,40 @@
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskStatus {
+    NotStarted,
+    OnTrack,
+    Done,
+    Late,
+}
+
+impl TaskStatus {
+    pub fn as_db_str(&self) -> &'static str {
+        match self {
+            TaskStatus::NotStarted => "not_started",
+            TaskStatus::OnTrack    => "on_track",
+            TaskStatus::Done       => "done",
+            TaskStatus::Late       => "late",
+        }
+    }
+
+    pub fn from_db_str(s: &str) -> Result<Self, String> {
+        match s {
+            "not_started" => Ok(TaskStatus::NotStarted),
+            "on_track"    => Ok(TaskStatus::OnTrack),
+            "done"        => Ok(TaskStatus::Done),
+            "late"        => Ok(TaskStatus::Late),
+            other         => Err(format!("unknown task status: {other}")),
+        }
+    }
+}
+
+impl Default for TaskStatus {
+    fn default() -> Self { TaskStatus::OnTrack }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Job {
     pub id: i64,
@@ -14,6 +48,8 @@ pub struct Job {
     pub holidays_block_work: bool,
     #[serde(default = "default_region")]
     pub region: String,
+    #[serde(default = "default_auto_shift_dependents")]
+    pub auto_shift_dependents: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,9 +62,12 @@ pub struct NewJob {
     pub holidays_block_work: bool,
     #[serde(default = "default_region")]
     pub region: String,
+    #[serde(default = "default_auto_shift_dependents")]
+    pub auto_shift_dependents: bool,
 }
 
 fn default_region() -> String { "ZA".into() }
+fn default_auto_shift_dependents() -> bool { true }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Phase {
@@ -64,6 +103,10 @@ pub struct Task {
     pub contact_id: Option<i64>,
     #[serde(default)]
     pub last_chaser_sent_at: Option<String>,
+    #[serde(default)]
+    pub status: TaskStatus,
+    #[serde(default)]
+    pub completion_date: Option<NaiveDate>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -163,6 +206,7 @@ mod tests {
             created_at: "2026-05-19T20:00:00".into(),
             holidays_block_work: true,
             region: "ZA".into(),
+            auto_shift_dependents: true,
         };
         let s = serde_json::to_string(&job).unwrap();
         let back: Job = serde_json::from_str(&s).unwrap();
@@ -188,6 +232,7 @@ mod tests {
             start_date: NaiveDate::from_ymd_opt(2026, 6, 8).unwrap(),
             duration_workdays: 3, order_index: 0, notes: None,
             contact_id: None, last_chaser_sent_at: None,
+            status: TaskStatus::default(), completion_date: None,
         };
         let s = serde_json::to_string(&t).unwrap();
         let back: Task = serde_json::from_str(&s).unwrap();

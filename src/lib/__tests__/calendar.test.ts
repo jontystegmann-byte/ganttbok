@@ -26,7 +26,7 @@ describe('calendar', () => {
 
   it('viewport extends past latest task end', () => {
     const tasks: Task[] = [
-      { id: 1, phase_id: 1, name: 'T', start_date: '2026-08-15', duration_workdays: 5, order_index: 0, notes: null },
+      { id: 1, phase_id: 1, name: 'T', start_date: '2026-08-15', duration_workdays: 5, order_index: 0, notes: null, contact_id: null, last_chaser_sent_at: null, status: 'on_track', completion_date: null },
     ];
     const days = computeViewportDays('2026-06-08', tasks);
     // Last day must be >= the task end (which is ~22 Aug).

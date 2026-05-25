@@ -64,6 +64,7 @@ mod tests {
             is_template: false,
             holidays_block_work: true,
             region: "ZA".into(),
+            auto_shift_dependents: true,
         }).unwrap();
         let existing = phase_repo::list_for_job(&conn, j.id).unwrap();
         let next = existing.iter().map(|p| p.order_index).max().unwrap_or(-1) + 1;

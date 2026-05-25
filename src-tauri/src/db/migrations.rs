@@ -125,6 +125,17 @@ const MIGRATIONS: &[&str] = &[
     CREATE INDEX idx_pending_patches_status_created
         ON pending_patches(status, created_at);
     "#,
+    // v8 — interactive task status (v1.7).
+    // Adds:
+    //   task.status            — 'not_started' | 'on_track' | 'done' | 'late' (default 'on_track')
+    //   task.completion_date   — nullable YYYY-MM-DD string, set when status = 'done'
+    //   job.auto_shift_dependents — 1 by default; if 0, ripple is skipped for this job
+    r#"
+    ALTER TABLE task ADD COLUMN status TEXT NOT NULL DEFAULT 'on_track'
+        CHECK (status IN ('not_started','on_track','done','late'));
+    ALTER TABLE task ADD COLUMN completion_date TEXT;
+    ALTER TABLE job  ADD COLUMN auto_shift_dependents INTEGER NOT NULL DEFAULT 1;
+    "#,
 ];
 
 pub fn apply_migrations(conn: &Connection) -> GbResult<()> {
@@ -249,5 +260,95 @@ mod tests {
             )
             .unwrap();
         assert_eq!(status, "proposed");
+    }
+
+    #[test]
+    fn task_table_has_status_and_completion_date_columns() {
+        let conn = Connection::open_in_memory().unwrap();
+        apply_migrations(&conn).unwrap();
+
+        let cols: Vec<String> = conn
+            .prepare("PRAGMA table_info(task)")
+            .unwrap()
+            .query_map([], |r| r.get::<_, String>(1))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+
+        for expected in &["status", "completion_date"] {
+            assert!(
+                cols.iter().any(|c| c == expected),
+                "missing column {expected}; got {cols:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn job_table_has_auto_shift_dependents_column() {
+        let conn = Connection::open_in_memory().unwrap();
+        apply_migrations(&conn).unwrap();
+
+        let cols: Vec<String> = conn
+            .prepare("PRAGMA table_info(job)")
+            .unwrap()
+            .query_map([], |r| r.get::<_, String>(1))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+
+        assert!(
+            cols.iter().any(|c| c == "auto_shift_dependents"),
+            "missing column auto_shift_dependents; got {cols:?}"
+        );
+    }
+
+    #[test]
+    fn new_task_defaults_to_on_track_status() {
+        let conn = Connection::open_in_memory().unwrap();
+        apply_migrations(&conn).unwrap();
+
+        conn.execute(
+            "INSERT INTO job (name, project_start_date) VALUES ('t', '2026-01-01')",
+            [],
+        ).unwrap();
+        let job_id: i64 = conn.last_insert_rowid();
+
+        conn.execute(
+            "INSERT INTO phase (job_id, name, colour, order_index, collapsed)
+             VALUES (?1, 'p', '#3B82F6', 0, 0)",
+            params![job_id],
+        ).unwrap();
+        let phase_id: i64 = conn.last_insert_rowid();
+
+        conn.execute(
+            "INSERT INTO task (phase_id, name, start_date, duration_workdays, order_index)
+             VALUES (?1, 'tk', '2026-01-02', 1, 0)",
+            params![phase_id],
+        ).unwrap();
+
+        let status: String = conn.query_row(
+            "SELECT status FROM task WHERE phase_id = ?1",
+            params![phase_id],
+            |r| r.get(0),
+        ).unwrap();
+        assert_eq!(status, "on_track");
+    }
+
+    #[test]
+    fn new_job_defaults_to_auto_shift_enabled() {
+        let conn = Connection::open_in_memory().unwrap();
+        apply_migrations(&conn).unwrap();
+
+        conn.execute(
+            "INSERT INTO job (name, project_start_date) VALUES ('t', '2026-01-01')",
+            [],
+        ).unwrap();
+
+        let auto: i64 = conn.query_row(
+            "SELECT auto_shift_dependents FROM job WHERE name = 't'",
+            [],
+            |r| r.get(0),
+        ).unwrap();
+        assert_eq!(auto, 1);
     }
 }

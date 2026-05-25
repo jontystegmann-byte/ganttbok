@@ -42,7 +42,9 @@ mod tests {
         Task { id, phase_id: 1, name: format!("T{id}"),
                start_date: start, duration_workdays: dur,
                order_index: id, notes: None,
-               contact_id: None, last_chaser_sent_at: None }
+               contact_id: None, last_chaser_sent_at: None,
+               status: crate::db::models::TaskStatus::default(),
+               completion_date: None }
     }
     fn dep(id: i64, pre: i64, suc: i64, lag: i64) -> Dependency {
         Dependency { id, predecessor_id: pre, successor_id: suc,

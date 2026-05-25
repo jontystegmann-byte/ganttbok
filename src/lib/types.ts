@@ -13,6 +13,7 @@ export interface Job {
   created_at: string;
   holidays_block_work: boolean;
   region: string;
+  auto_shift_dependents: boolean;
 }
 
 export interface Phase {
@@ -54,6 +55,8 @@ export interface Task {
   notes: string | null;
   contact_id: number | null;
   last_chaser_sent_at: string | null;
+  status: TaskStatus;
+  completion_date: string | null;
 }
 
 export interface Dependency {
@@ -197,6 +200,8 @@ export interface Patch {
   summary: string;
   ops: PatchOp[];
 }
+
+export type TaskStatus = 'not_started' | 'on_track' | 'done' | 'late';
 
 export type PatchStatus =
   | 'proposed'

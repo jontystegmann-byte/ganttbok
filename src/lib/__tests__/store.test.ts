@@ -22,11 +22,11 @@ describe('Store', () => {
 
   it('applyDragResult patches tasks by id', () => {
     store.tasks = [
-      { id: 1, phase_id: 1, name: 'A', start_date: '2026-06-08', duration_workdays: 1, order_index: 0, notes: null },
-      { id: 2, phase_id: 1, name: 'B', start_date: '2026-06-09', duration_workdays: 1, order_index: 1, notes: null },
+      { id: 1, phase_id: 1, name: 'A', start_date: '2026-06-08', duration_workdays: 1, order_index: 0, notes: null, contact_id: null, last_chaser_sent_at: null, status: 'on_track', completion_date: null },
+      { id: 2, phase_id: 1, name: 'B', start_date: '2026-06-09', duration_workdays: 1, order_index: 1, notes: null, contact_id: null, last_chaser_sent_at: null, status: 'on_track', completion_date: null },
     ];
     store.applyDragResult([
-      { id: 1, phase_id: 1, name: 'A', start_date: '2026-06-10', duration_workdays: 1, order_index: 0, notes: null },
+      { id: 1, phase_id: 1, name: 'A', start_date: '2026-06-10', duration_workdays: 1, order_index: 0, notes: null, contact_id: null, last_chaser_sent_at: null, status: 'on_track', completion_date: null },
     ]);
     expect(store.tasks[0].start_date).toBe('2026-06-10');
     expect(store.tasks[1].start_date).toBe('2026-06-09'); // untouched

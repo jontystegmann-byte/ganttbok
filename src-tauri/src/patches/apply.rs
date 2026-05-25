@@ -257,6 +257,7 @@ mod tests {
             name: "Test Job".into(), client: None, address: None,
             project_start_date: NaiveDate::from_ymd_opt(2026, 6, 1).unwrap(),
             is_template: false, holidays_block_work: false, region: "ZA".into(),
+            auto_shift_dependents: true,
         }).unwrap();
         let p = phase::create(&conn, &NewPhase {
             job_id: j.id, name: "Foundation".into(), colour: "#3B82F6".into(),

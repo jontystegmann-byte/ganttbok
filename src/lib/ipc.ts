@@ -6,6 +6,7 @@ import type {
   Contact, NudgeResult,
   PendingPatch,
   ClaudeSurface, ClaudeDetectionResult,
+  TaskStatus,
 } from './types';
 
 // Jobs
@@ -40,6 +41,15 @@ export const reorderTasks = (phaseId: number, orderedIds: number[])  => invoke<v
 
 // Drag
 export const dragTask = (args: DragTaskArgs) => invoke<DragResult>('drag_task', { args });
+
+export const setTaskStatus = (
+  id: number,
+  status: TaskStatus,
+  completionDate: string | null,
+) => invoke<void>('set_task_status', { id, status, completionDate });
+
+export const setJobAutoShift = (id: number, enabled: boolean) =>
+  invoke<void>('set_job_auto_shift', { id, enabled });
 
 // Dependencies
 export const listDependencies     = (jobId: number)                  => invoke<Dependency[]>('list_dependencies', { jobId });

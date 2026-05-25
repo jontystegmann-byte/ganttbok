@@ -92,6 +92,7 @@ mod tests {
             is_template: false,
             holidays_block_work: true,
             region: "ZA".into(),
+            auto_shift_dependents: true,
         }).unwrap();
         j.id
     }

@@ -123,6 +123,7 @@ mod tests {
             is_template: false,
             holidays_block_work: true,
             region: "ZA".into(),
+            auto_shift_dependents: true,
         }).unwrap();
         let n = sync_sa_holidays(
             &conn, j.id,
@@ -141,6 +142,7 @@ mod tests {
             is_template: false,
             holidays_block_work: true,
             region: "ZA".into(),
+            auto_shift_dependents: true,
         }).unwrap();
         create(&conn, &NewNoWorkDay {
             job_id: j.id,

@@ -2,9 +2,9 @@ use chrono::NaiveDate;
 use serde::Deserialize;
 use tauri::State;
 use crate::commands::Db;
-use crate::db::models::{Task, NewTask};
+use crate::db::models::{Task, NewTask, TaskStatus};
 use crate::repo::task as task_repo;
-use crate::GbResult;
+use crate::{GbError, GbResult};
 
 #[derive(Debug, Deserialize)]
 pub struct CreateTaskArgs {
@@ -53,12 +53,49 @@ pub fn reorder_tasks(db: State<Db>, phase_id: i64, ordered_ids: Vec<i64>) -> GbR
     task_repo::reorder(&conn, phase_id, &ordered_ids)
 }
 
+#[tauri::command]
+pub fn set_task_status(
+    db: State<Db>,
+    id: i64,
+    status: String,
+    completion_date: Option<String>,
+) -> GbResult<()> {
+    let conn = db.0.lock().unwrap();
+    let parsed = completion_date.as_deref().map(parse_date).transpose()?;
+    set_task_status_inner(&conn, id, &status, parsed)
+}
+
+fn parse_date(s: &str) -> Result<chrono::NaiveDate, GbError> {
+    chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
+        .map_err(|e| GbError::Validation(format!("bad date {s}: {e}")))
+}
+
+pub(crate) fn set_task_status_inner(
+    conn: &rusqlite::Connection,
+    id: i64,
+    status: &str,
+    completion_date: Option<chrono::NaiveDate>,
+) -> GbResult<()> {
+    let status_enum = TaskStatus::from_db_str(status)
+        .map_err(GbError::Validation)?;
+
+    let mut task = crate::repo::task::get(conn, id)?;
+    task.status = status_enum;
+    task.completion_date = if status_enum == TaskStatus::Done {
+        Some(completion_date.unwrap_or_else(|| chrono::Local::now().date_naive()))
+    } else {
+        None
+    };
+    crate::repo::task::update(conn, &task)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::db::connection::open_in_memory;
-    use crate::db::models::{NewJob, NewPhase};
+    use crate::db::models::{NewJob, NewPhase, TaskStatus};
     use crate::repo::{job, phase};
+    use std::sync::Mutex;
 
     fn setup() -> (rusqlite::Connection, i64) {
         let conn = open_in_memory().unwrap();
@@ -68,12 +105,27 @@ mod tests {
             is_template: false,
             holidays_block_work: true,
             region: "ZA".into(),
+            auto_shift_dependents: true,
         }).unwrap();
         let p = phase::create(&conn, &NewPhase {
             job_id: j.id, name: "P".into(), colour: "#000".into(),
             order_index: 0, collapsed: false,
         }).unwrap();
         (conn, p.id)
+    }
+
+    /// In-memory DB seeded with one job, one phase, one task — all at id=1.
+    fn create_test_db() -> Db {
+        let (conn, phase_id) = setup();
+        task_repo::create(&conn, &NewTask {
+            phase_id,
+            name: "T".into(),
+            start_date: NaiveDate::from_ymd_opt(2026, 6, 8).unwrap(),
+            duration_workdays: 1,
+            order_index: 0,
+            notes: None,
+        }).unwrap();
+        Db(Mutex::new(conn))
     }
 
     #[test]
@@ -90,5 +142,30 @@ mod tests {
         task_repo::update(&conn, &t2).unwrap();
         let fetched = task_repo::get(&conn, t.id).unwrap();
         assert_eq!(fetched.duration_workdays, 1);
+    }
+
+    #[test]
+    fn set_task_status_done_writes_completion_date() {
+        let db = create_test_db();
+
+        let now = chrono::Local::now().date_naive();
+        set_task_status_inner(&db.0.lock().unwrap(), 1, "done", Some(now)).unwrap();
+
+        let task = crate::repo::task::get(&db.0.lock().unwrap(), 1).unwrap();
+        assert_eq!(task.status, TaskStatus::Done);
+        assert_eq!(task.completion_date, Some(now));
+    }
+
+    #[test]
+    fn set_task_status_clears_completion_date_when_not_done() {
+        let db = create_test_db();
+        let now = chrono::Local::now().date_naive();
+
+        set_task_status_inner(&db.0.lock().unwrap(), 1, "done", Some(now)).unwrap();
+        set_task_status_inner(&db.0.lock().unwrap(), 1, "on_track", None).unwrap();
+
+        let task = crate::repo::task::get(&db.0.lock().unwrap(), 1).unwrap();
+        assert_eq!(task.status, TaskStatus::OnTrack);
+        assert_eq!(task.completion_date, None);
     }
 }

@@ -7,7 +7,8 @@ const phases: Phase[] = [
 ];
 const tasks: Task[] = [
   { id: 10, phase_id: 1, name: 'Order windows', start_date: '2026-06-08',
-    duration_workdays: 5, order_index: 0, notes: null, contact_id: null, last_chaser_sent_at: null },
+    duration_workdays: 5, order_index: 0, notes: null, contact_id: null, last_chaser_sent_at: null,
+    status: 'on_track', completion_date: null },
 ];
 const contacts: Contact[] = [
   { id: 100, name: 'Doug Supplies', telegram_chat_id: null, telegram_handle: null,
