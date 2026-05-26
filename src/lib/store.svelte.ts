@@ -1,5 +1,5 @@
 import * as ipc from './ipc';
-import type { Job, Phase, Task, Dependency, NoWorkDay, Contact, PendingPatch } from './types';
+import type { Job, Phase, Task, Dependency, NoWorkDay, Contact, PendingPatch, TaskStatus } from './types';
 import type { Zone } from './hit-test';
 import { UndoStack, type Snapshot as UndoSnapshot } from './undo';
 
@@ -336,7 +336,11 @@ class Store {
   /** Refresh todayIso to the actual current date. Called on bootstrap, focus, and a minute timer. */
   tickToday(): void {
     const iso = new Date().toISOString().slice(0, 10);
-    if (iso !== this.todayIso) this.todayIso = iso;
+    if (iso !== this.todayIso) {
+      this.todayIso = iso;
+      // Date rolled over — re-evaluate auto-transitions for the new day.
+      this.runStartedAutoTransition().catch(() => { /* best-effort */ });
+    }
   }
 
   /** Scroll the canvas .grid-area so today's column sits ~1 week from the left visible edge. */
@@ -370,6 +374,9 @@ class Store {
       try { await this.openJob(meta.last_open_job_id); }
       catch { /* job may have been deleted */ }
     }
+
+    // One-shot at boot: flip any Not Started tasks whose start_date has arrived.
+    await this.runStartedAutoTransition();
 
     await this.refreshContacts();
 
@@ -485,6 +492,25 @@ class Store {
     }
     this.recordHistory();
     await ipc.touchLastSave();
+  }
+
+  async setTaskStatus(taskId: number, status: TaskStatus, completionDate: string | null): Promise<void> {
+    const idx = this.tasks.findIndex(t => t.id === taskId);
+    if (idx >= 0) {
+      this.tasks[idx] = { ...this.tasks[idx], status, completion_date: completionDate };
+    }
+    await ipc.setTaskStatus(taskId, status, completionDate);
+    await ipc.touchLastSave();
+  }
+
+  /** Run the Not Started → On Track auto-transition for the current local date,
+   *  then re-pull the open job's tasks so the UI reflects any flips. */
+  async runStartedAutoTransition(): Promise<void> {
+    if (!this.currentJob) return;
+    const flipped = await ipc.autoTransitionStartedTasks(this.todayIso);
+    if (flipped > 0) {
+      this.tasks = await ipc.listTasks(this.currentJob.id);
+    }
   }
 
   // Optimistic local update applied after an IPC mutation returns updated rows.

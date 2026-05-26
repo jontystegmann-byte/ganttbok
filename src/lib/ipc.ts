@@ -51,6 +51,9 @@ export const setTaskStatus = (
 export const setJobAutoShift = (id: number, enabled: boolean) =>
   invoke<void>('set_job_auto_shift', { id, enabled });
 
+export const autoTransitionStartedTasks = (today: string) =>
+  invoke<number>('auto_transition_started_tasks', { today });
+
 // Dependencies
 export const listDependencies     = (jobId: number)                  => invoke<Dependency[]>('list_dependencies', { jobId });
 export const createDependency     = (args: CreateDepArgs)            => invoke<Dependency>('create_dependency', { args });

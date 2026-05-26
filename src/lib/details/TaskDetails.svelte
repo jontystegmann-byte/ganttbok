@@ -1,7 +1,7 @@
 <script lang="ts">
   import { store } from '../store.svelte';
   import * as ipc from '../ipc';
-  import type { Task } from '../types';
+  import type { Task, TaskStatus } from '../types';
 
   let { taskId }: { taskId: number } = $props();
   const task = $derived(store.tasks.find(t => t.id === taskId));
@@ -36,6 +36,15 @@
     await ipc.updateTask($state.snapshot(updated));
     store.tasks = store.tasks.map(t => t.id === updated.id ? updated : t);
     await ipc.touchLastSave();
+  }
+
+  async function onStatusChange(e: Event) {
+    if (!task) return;
+    const newStatus = (e.currentTarget as HTMLSelectElement).value as TaskStatus;
+    const completion = newStatus === 'done'
+      ? new Date().toISOString().slice(0, 10)
+      : null;
+    await store.setTaskStatus(task.id, newStatus, completion);
   }
 
   async function assignContact(e: Event) {
@@ -92,6 +101,14 @@
     <label>Name<input bind:value={name} onblur={save} /></label>
     <label>Duration (workdays)<input type="number" min="1" bind:value={duration} onblur={save} /></label>
     <label>Start<input type="date" value={task.start_date} disabled /></label>
+    <label>Status
+      <select value={task.status ?? 'not_started'} onchange={onStatusChange}>
+        <option value="not_started">Not Started</option>
+        <option value="on_track">On Track</option>
+        <option value="late">Late</option>
+        <option value="done">Done</option>
+      </select>
+    </label>
     <label>Notes<textarea bind:value={notes} onblur={save} rows="4"></textarea></label>
 
     <section class="chaser">

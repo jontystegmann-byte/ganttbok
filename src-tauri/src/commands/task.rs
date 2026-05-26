@@ -54,6 +54,13 @@ pub fn reorder_tasks(db: State<Db>, phase_id: i64, ordered_ids: Vec<i64>) -> GbR
 }
 
 #[tauri::command]
+pub fn auto_transition_started_tasks(db: State<Db>, today: String) -> GbResult<usize> {
+    let conn = db.0.lock().unwrap();
+    let parsed = parse_date(&today)?;
+    task_repo::auto_transition_started(&conn, parsed)
+}
+
+#[tauri::command]
 pub fn set_task_status(
     db: State<Db>,
     id: i64,
@@ -154,6 +161,49 @@ mod tests {
         let task = crate::repo::task::get(&db.0.lock().unwrap(), 1).unwrap();
         assert_eq!(task.status, TaskStatus::Done);
         assert_eq!(task.completion_date, Some(now));
+    }
+
+    #[test]
+    fn new_task_defaults_to_not_started() {
+        let (conn, phase_id) = setup();
+        let t = task_repo::create(&conn, &NewTask {
+            phase_id, name: "X".into(),
+            start_date: NaiveDate::from_ymd_opt(2030, 1, 1).unwrap(), // far future
+            duration_workdays: 2, order_index: 0, notes: None,
+        }).unwrap();
+        assert_eq!(t.status, TaskStatus::NotStarted);
+    }
+
+    #[test]
+    fn auto_transition_flips_only_started_not_started_tasks() {
+        let (conn, phase_id) = setup();
+        // Task A: starts yesterday, Not Started → should flip
+        let a = task_repo::create(&conn, &NewTask {
+            phase_id, name: "A".into(),
+            start_date: NaiveDate::from_ymd_opt(2026, 6, 7).unwrap(),
+            duration_workdays: 1, order_index: 0, notes: None,
+        }).unwrap();
+        // Task B: starts tomorrow, Not Started → must NOT flip
+        let b = task_repo::create(&conn, &NewTask {
+            phase_id, name: "B".into(),
+            start_date: NaiveDate::from_ymd_opt(2026, 6, 9).unwrap(),
+            duration_workdays: 1, order_index: 1, notes: None,
+        }).unwrap();
+        // Task C: starts yesterday, Done → must NOT be touched
+        let c = task_repo::create(&conn, &NewTask {
+            phase_id, name: "C".into(),
+            start_date: NaiveDate::from_ymd_opt(2026, 6, 7).unwrap(),
+            duration_workdays: 1, order_index: 2, notes: None,
+        }).unwrap();
+        set_task_status_inner(&conn, c.id, "done", Some(NaiveDate::from_ymd_opt(2026, 6, 7).unwrap())).unwrap();
+
+        let today = NaiveDate::from_ymd_opt(2026, 6, 8).unwrap();
+        let n = task_repo::auto_transition_started(&conn, today).unwrap();
+        assert_eq!(n, 1, "only Task A should flip");
+
+        assert_eq!(task_repo::get(&conn, a.id).unwrap().status, TaskStatus::OnTrack);
+        assert_eq!(task_repo::get(&conn, b.id).unwrap().status, TaskStatus::NotStarted);
+        assert_eq!(task_repo::get(&conn, c.id).unwrap().status, TaskStatus::Done);
     }
 
     #[test]
