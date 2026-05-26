@@ -1,3 +1,26 @@
+Blik Plan v1.7.0 — Live schedule, inbox review, redesigned layout
+
+NEW
+- **Interactive task status** — every task carries On Track (green), Late (red), or Done (grey) right on the bar. Pick status from the Status dropdown in TaskDetails. Phases roll up: if any child is Late the phase bar paints red.
+- **Inbox review workflow** — when a task's end date passes without being marked Done, an entry appears in the Inbox with the phase, task name, and due date. Two actions:
+  - **Mark Done…** opens a date picker (defaults to the planned end). Confirming adjusts the bar's duration so its end aligns with the picked date and ripples dependent tasks both directions: pulls them in if you finished early, pushes them out if you finished late.
+  - **Running late** flags it red, catch-up extends the bar so it reaches today, and pushes dependent tasks out by the same workday delta.
+- **Daily Late auto-extension** — on app launch and again at midnight rollover, every Late task gets catch-up extended by the workdays that have passed; dependents shift accordingly. Idempotent — same-day re-runs do nothing.
+- **Per-job dependency ripple** respects the new `auto_shift_dependents` flag on each job (default ON). Switch it off for exploratory jobs where you don't want dependents auto-moving.
+- **Bidirectional ripple** — the dependency engine now supports both downstream pushes (Late) and upstream pulls (early Done). Previously drag-only and downstream-only.
+- **Undo (Cmd+Z) covers status changes** — flip a task to Done, regret it, hit Cmd+Z. Bar geometry and dependent shifts both revert.
+- **Phase divider lines** — a 1px slate-grey line between every phase so it's obvious which tasks belong to which phase when two phases are expanded next to each other.
+
+REDESIGN
+- **Top header bar** with the BLIK Plan logo on the left, an inline **job switcher dropdown** centre-left, and saved indicator + version on the right.
+- **Labelled action bar** under the header — Inbox · Notes · Contacts · Settings · Print. Every tool visible, nothing hidden in popovers.
+- **Unified right-hand-side panels** — Inbox, Notes, Contacts, and Settings all slide in from the right at the same 420px width. Picking a different tool while one is open swaps them; picking the same tool again closes it.
+- **Scroll-locked split view** — the task/phase column and the bar timeline now scroll together in a single shared scroll container with sticky positioning. No more JS sync — completely smooth.
+- **Left sidebar removed** — jobs live in the dropdown, so the chart fills the full width.
+- **Tooltip on bar hover** — 200ms delay, shows status, start/end, duration, completion date.
+
+—
+
 Blik Plan v1.6.0-beta.1 — Claude connector
 
 FIX (v1.6.0-beta.1)
