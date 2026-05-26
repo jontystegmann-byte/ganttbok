@@ -2,6 +2,7 @@
   import { store } from '../store.svelte';
   import HeaderStrip from './HeaderStrip.svelte';
   import LeftRail from './LeftRail.svelte';
+  import JobSwitcher from '../sidebar/JobSwitcher.svelte';
   import NoWorkColumn from './NoWorkColumn.svelte';
   import WeekGridLines from './WeekGridLines.svelte';
   import HoverColumn from './HoverColumn.svelte';
@@ -72,7 +73,7 @@
 <div class="gantt" style="--cell-w: {CELL}px; --total-w: {days.length * CELL}px;">
   <DragOverlay />
   <DepCreator />
-  <div class="corner"></div>
+  <div class="corner"><JobSwitcher /></div>
   <div class="header-row"><HeaderStrip {days} /></div>
   <div class="rail-col"><LeftRail /></div>
   <div class="time-col">
@@ -163,6 +164,9 @@
     background: var(--c-panel);
     border-right: 1px solid var(--c-border);
     border-bottom: 1px solid var(--c-border-bold);
+    display: flex;
+    align-items: center;
+    padding: 0 var(--sp-2);
   }
   .header-row {
     grid-row: 1; grid-column: 2;

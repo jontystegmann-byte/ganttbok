@@ -3,6 +3,7 @@
   import { store } from './lib/store.svelte';
   import AppHeader from './lib/components/AppHeader.svelte';
   import GanttCanvas from './lib/canvas/GanttCanvas.svelte';
+  import JobSwitcher from './lib/sidebar/JobSwitcher.svelte';
   import DetailsPanel from './lib/details/DetailsPanel.svelte';
   import PrintOptions from './lib/print/PrintOptions.svelte';
   import Toast from './lib/components/Toast.svelte';
@@ -43,7 +44,8 @@
       {:else}
         <div class="empty-state">
           <h1><span style="font-weight: 900">BLIK</span> <span style="font-weight: 300; color: var(--c-text-muted)">Plan</span></h1>
-          <p>Pick a job from the dropdown above, or create a new one.</p>
+          <p>Pick a job to get started.</p>
+          <JobSwitcher />
         </div>
       {/if}
     </main>
@@ -112,6 +114,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: var(--sp-3);
     height: 100%;
     color: var(--c-text-muted);
   }
