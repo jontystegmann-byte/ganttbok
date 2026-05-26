@@ -102,8 +102,7 @@
     <label>Duration (workdays)<input type="number" min="1" bind:value={duration} onblur={save} /></label>
     <label>Start<input type="date" value={task.start_date} disabled /></label>
     <label>Status
-      <select value={task.status ?? 'not_started'} onchange={onStatusChange}>
-        <option value="not_started">Not Started</option>
+      <select value={task.status ?? 'on_track'} onchange={onStatusChange}>
         <option value="on_track">On Track</option>
         <option value="late">Late</option>
         <option value="done">Done</option>

@@ -201,7 +201,7 @@ export interface Patch {
   ops: PatchOp[];
 }
 
-export type TaskStatus = 'not_started' | 'on_track' | 'done' | 'late';
+export type TaskStatus = 'on_track' | 'done' | 'late';
 
 export type PatchStatus =
   | 'proposed'

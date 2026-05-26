@@ -6,29 +6,16 @@ use crate::{GbError, GbResult};
 const SELECT_COLS: &str = "id, phase_id, name, start_date, duration_workdays, order_index, notes, contact_id, last_chaser_sent_at, status, completion_date";
 
 pub fn create(conn: &Connection, new: &NewTask) -> GbResult<Task> {
-    // New tasks default to 'not_started'. They auto-transition to 'on_track'
-    // when today's date reaches start_date (via auto_transition_started_tasks).
+    // New tasks default to 'on_track' (DB column DEFAULT).
     conn.execute(
-        "INSERT INTO task (phase_id, name, start_date, duration_workdays, order_index, notes, status)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'not_started')",
+        "INSERT INTO task (phase_id, name, start_date, duration_workdays, order_index, notes)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         params![
             new.phase_id, new.name, new.start_date.to_string(),
             new.duration_workdays, new.order_index, new.notes,
         ],
     )?;
     get(conn, conn.last_insert_rowid())
-}
-
-/// Flip every task with status='not_started' AND start_date <= today
-/// to status='on_track'. Returns the number of rows updated.
-/// One-way only — never reverses an already-started task.
-pub fn auto_transition_started(conn: &Connection, today: NaiveDate) -> GbResult<usize> {
-    let n = conn.execute(
-        "UPDATE task SET status = 'on_track'
-         WHERE status = 'not_started' AND start_date <= ?1",
-        params![today.format("%Y-%m-%d").to_string()],
-    )?;
-    Ok(n)
 }
 
 pub fn get(conn: &Connection, id: i64) -> GbResult<Task> {

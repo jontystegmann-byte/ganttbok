@@ -7,7 +7,7 @@
   import BottomToolbar from '../components/BottomToolbar.svelte';
 </script>
 
-<div class="sidebar">
+<div class="sidebar" class:collapsed={store.sidebarCollapsed}>
   <header>
     <div class="brand">
       <svg class="brand-mark" width="22" height="18" viewBox="0 0 240 200" aria-hidden="true">
@@ -25,20 +25,35 @@
       <h2 class="wordmark"><span class="blik">BLIK</span> <span class="plan">Plan</span></h2>
     </div>
   </header>
-  <section>
-    <h3>Active</h3>
-    {#each store.jobs as job (job.id)}
-      <JobItem {job} />
-    {:else}
-      <p class="hint">No jobs yet</p>
-    {/each}
-  </section>
-  <TemplatesGroup />
-  <ArchivedGroup />
-  <footer>
-    <button class="new-job" onclick={() => store.showNewJobModal = true}>+ New job</button>
-    <BottomToolbar />
-  </footer>
+  {#if !store.sidebarCollapsed}
+    <section>
+      <h3>Active</h3>
+      {#each store.jobs as job (job.id)}
+        <JobItem {job} />
+      {:else}
+        <p class="hint">No jobs yet</p>
+      {/each}
+    </section>
+    <TemplatesGroup />
+    <ArchivedGroup />
+    <footer>
+      <button class="new-job" onclick={() => store.showNewJobModal = true}>+ New job</button>
+      <BottomToolbar />
+    </footer>
+  {/if}
+  <button
+    class="collapse-toggle"
+    onclick={() => store.sidebarCollapsed = !store.sidebarCollapsed}
+    aria-label={store.sidebarCollapsed ? 'Show jobs sidebar' : 'Hide jobs sidebar'}
+    title={store.sidebarCollapsed ? 'Show jobs' : 'Hide jobs'}
+  >
+    <svg width="10" height="14" viewBox="0 0 10 14" aria-hidden="true">
+      <path
+        d={store.sidebarCollapsed ? 'M2 1 L8 7 L2 13' : 'M8 1 L2 7 L8 13'}
+        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+      />
+    </svg>
+  </button>
 </div>
 
 {#if store.showNewJobModal}
@@ -46,7 +61,9 @@
 {/if}
 
 <style>
-  .sidebar { display: flex; flex-direction: column; height: 100%; }
+  .sidebar { display: flex; flex-direction: column; height: 100%; position: relative; }
+  .sidebar.collapsed .wordmark { display: none; }
+  .sidebar.collapsed header { padding: var(--sp-3) 0; display: flex; justify-content: center; }
   header   { padding: var(--sp-3); border-bottom: 1px solid var(--c-border); }
   header .brand { display: flex; align-items: center; gap: var(--sp-2); }
   header .brand-mark { flex-shrink: 0; }
@@ -54,6 +71,24 @@
   header .wordmark .blik { font-weight: 900; }
   header .wordmark .plan { font-weight: 300; color: var(--c-text-muted); }
   section  { flex: 1; padding: var(--sp-2) 0; overflow-y: auto; }
+
+  .collapse-toggle {
+    position: absolute;
+    top: 50%;
+    right: -12px;
+    transform: translateY(-50%);
+    width: 24px; height: 32px;
+    border: 1px solid var(--c-border);
+    background: var(--c-panel);
+    color: var(--c-text-muted);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0;
+    box-shadow: 0 1px 3px var(--c-shadow);
+    z-index: 10;
+  }
+  .collapse-toggle:hover { color: var(--c-text); background: var(--c-bg); }
   section h3 {
     font-size: var(--font-size-xs); text-transform: uppercase;
     color: var(--c-text-muted); letter-spacing: 0.06em;

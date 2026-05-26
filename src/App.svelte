@@ -35,7 +35,7 @@
 </script>
 
 <div class="app-shell">
-  <aside class="sidebar" style="width: {store.sidebarWidth}px">
+  <aside class="sidebar" class:collapsed={store.sidebarCollapsed} style="width: {store.sidebarCollapsed ? 44 : store.sidebarWidth}px">
     <Sidebar />
   </aside>
 
@@ -98,6 +98,11 @@
     overflow-y: auto;
     min-width: 180px;
     max-width: 480px;
+    transition: width 180ms ease, min-width 180ms ease;
+  }
+  .sidebar.collapsed {
+    min-width: 44px;
+    overflow: visible; /* allow the collapse-button to overflow the right edge */
   }
   .canvas-pane {
     overflow: auto;

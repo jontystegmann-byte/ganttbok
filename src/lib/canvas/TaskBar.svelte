@@ -1,7 +1,21 @@
 <script lang="ts">
-  import type { Task, Phase } from '../types';
+  import type { Task, Phase, TaskStatus } from '../types';
   import { store } from '../store.svelte';
   import { hitZone, EDGE_PX } from '../hit-test';
+
+  // Status visual map. Literal hex codes — SVG `fill` attribute does not reliably
+  // resolve CSS var() references in this WebKit, so we paint the values directly.
+  function statusFill(s: TaskStatus | undefined | null): string {
+    switch (s) {
+      case 'late':     return '#E11D2A';
+      case 'done':     return '#9CA3AF';
+      case 'on_track':
+      default:         return '#10B981';
+    }
+  }
+  function statusTextColor(_s: TaskStatus | undefined | null): string {
+    return 'white';
+  }
 
   let { task, phase, days, row }: {
     task: Task; phase: Phase; days: { date: string }[]; row: number;
@@ -103,9 +117,9 @@
       x={livePreview.x} y={y}
       width={livePreview.w} height={20}
       rx={3}
-      fill={phase.colour}
+      fill={statusFill(task.status)}
       fill-opacity={0.4}
-      stroke={isSelected ? 'var(--c-accent)' : 'transparent'}
+      stroke={isSelected ? '#E11D2A' : 'transparent'}
       stroke-width="2"
       class="bar-body zone-move"
       onpointerdown={onBodyDown}
@@ -116,10 +130,10 @@
         x={seg.start * 24} y={y}
         width={seg.len * 24} height={20}
         rx={3}
-        fill={phase.colour}
+        fill={statusFill(task.status)}
         fill-opacity={isPast ? 0.25 : 1}
-        stroke={isSelected && si === 0 ? 'var(--c-accent)' : 'transparent'}
-        stroke-width="2"
+        stroke={isSelected && si === 0 ? '#E11D2A' : 'transparent'}
+        stroke-width={isSelected && si === 0 ? 2 : 0}
         class="bar-body zone-move"
         class:past={isPast}
         onpointerdown={onBodyDown}
@@ -158,7 +172,7 @@
   {#if livePreview.w > 60}
     <text
       x={livePreview.x + 6} y={y + 14}
-      fill={isPast ? 'rgba(0,0,0,0.4)' : 'white'}
+      fill={isPast ? 'rgba(0,0,0,0.4)' : statusTextColor(task.status)}
       font-size="11" pointer-events="none"
     >{task.name}</text>
   {/if}

@@ -136,6 +136,15 @@ const MIGRATIONS: &[&str] = &[
     ALTER TABLE task ADD COLUMN completion_date TEXT;
     ALTER TABLE job  ADD COLUMN auto_shift_dependents INTEGER NOT NULL DEFAULT 1;
     "#,
+    // v9 — drop 'not_started' status from the model (v1.7 simplification).
+    // Tasks default to 'on_track'; users mark Late or Done explicitly.
+    // Existing 'not_started' rows are coerced to 'on_track'. The CHECK constraint
+    // is left as-is (still tolerates 'not_started') because SQLite can't easily
+    // alter constraints without recreating the table; the application no longer
+    // writes that value.
+    r#"
+    UPDATE task SET status = 'on_track' WHERE status = 'not_started';
+    "#,
 ];
 
 pub fn apply_migrations(conn: &Connection) -> GbResult<()> {

@@ -67,7 +67,6 @@ pub fn run() {
             commands::task::delete_task,
             commands::task::reorder_tasks,
             commands::task::set_task_status,
-            commands::task::auto_transition_started_tasks,
             commands::drag::drag_task,
             commands::dependency::list_dependencies,
             commands::dependency::create_dependency,

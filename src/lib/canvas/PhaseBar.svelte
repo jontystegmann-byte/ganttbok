@@ -19,6 +19,10 @@
 
   const y = $derived(row * 32 + 6);
   const isDragging = $derived(store.dragState?.taskId === -phase.id);
+  // Phase status rollup: green by default; red if ANY child task is Late.
+  // Done children don't affect phase appearance.
+  const hasLateChild = $derived(tasks.some(t => t.status === 'late'));
+  const phaseFill = $derived(hasLateChild ? '#E11D2A' : '#10B981');
 
   const liveX = $derived.by(() => {
     if (!span) return 0;
@@ -46,10 +50,10 @@
     x={liveX} y={y}
     width={span.w} height={20}
     rx={3}
-    fill={phase.colour}
-    fill-opacity={isDragging ? 0.35 : 0.18}
-    stroke={phase.colour}
-    stroke-opacity="0.5"
+    fill={phaseFill}
+    fill-opacity={isDragging ? 0.6 : 0.9}
+    stroke={phaseFill}
+    stroke-opacity="1"
     stroke-width="1"
     onpointerdown={onPointerDown}
   />

@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskStatus {
-    NotStarted,
     OnTrack,
     Done,
     Late,
@@ -13,20 +12,20 @@ pub enum TaskStatus {
 impl TaskStatus {
     pub fn as_db_str(&self) -> &'static str {
         match self {
-            TaskStatus::NotStarted => "not_started",
-            TaskStatus::OnTrack    => "on_track",
-            TaskStatus::Done       => "done",
-            TaskStatus::Late       => "late",
+            TaskStatus::OnTrack => "on_track",
+            TaskStatus::Done    => "done",
+            TaskStatus::Late    => "late",
         }
     }
 
     pub fn from_db_str(s: &str) -> Result<Self, String> {
         match s {
-            "not_started" => Ok(TaskStatus::NotStarted),
-            "on_track"    => Ok(TaskStatus::OnTrack),
-            "done"        => Ok(TaskStatus::Done),
-            "late"        => Ok(TaskStatus::Late),
-            other         => Err(format!("unknown task status: {other}")),
+            // Legacy: any historical 'not_started' rows are coerced to OnTrack so
+            // existing DBs continue to deserialize cleanly even after migration v9.
+            "not_started" | "on_track" => Ok(TaskStatus::OnTrack),
+            "done"                     => Ok(TaskStatus::Done),
+            "late"                     => Ok(TaskStatus::Late),
+            other                      => Err(format!("unknown task status: {other}")),
         }
     }
 }

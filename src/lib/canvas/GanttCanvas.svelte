@@ -52,6 +52,20 @@
     rows.forEach((r, i) => { if (r.kind === 'task') m.set(r.task.id, i); });
     return m;
   });
+
+  // Phase dividers: one bold horizontal line at every phase boundary
+  // (top of each phase + bottom of the very last phase).
+  const phaseDividerYs = $derived.by((): number[] => {
+    if (rows.length === 0) return [];
+    const ys: number[] = [0]; // top of the first phase
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i].phase.id !== rows[i - 1].phase.id) {
+        ys.push(i * ROW_H);
+      }
+    }
+    ys.push(rows.length * ROW_H); // bottom of the last phase
+    return ys;
+  });
 </script>
 
 <div class="gantt" style="--cell-w: {CELL}px;">
@@ -115,6 +129,15 @@
         {/each}
         {#each store.dependencies as dep (dep.id)}
           <DependencyArrow {dep} tasks={store.tasks} rowIndex={rowIndexMap} {days} />
+        {/each}
+        <!-- Phase dividers — drawn last so they sit on top of everything else -->
+        {#each phaseDividerYs as dy}
+          <line
+            x1="0" y1={dy}
+            x2={days.length * CELL} y2={dy}
+            stroke="#4B5563" stroke-width="1"
+            pointer-events="none"
+          />
         {/each}
       </svg>
     </div>
