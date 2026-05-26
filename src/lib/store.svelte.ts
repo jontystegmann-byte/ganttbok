@@ -31,7 +31,6 @@ class Store {
 
   selection     = $state<Selection>(null);
   sidebarWidth  = $state<number>(240);
-  sidebarCollapsed = $state<boolean>(false);
   showNewJobModal = $state<boolean>(false);
   archivedJobs = $state<Job[]>([]);
   hoveredTaskId = $state<number | null>(null);
@@ -57,12 +56,17 @@ class Store {
 
   // Chaser
   contacts = $state<Contact[]>([]);
-  showContactsPage = $state<boolean>(false);
 
   // Inbox — proposed patches from MCP / external sources
   inboxPatches    = $state<PendingPatch[]>([]);
-  inboxOpen       = $state<boolean>(false);
   private inboxPollTimer: number | null = null;
+
+  // Exactly one right-hand-side tool panel may be open at a time.
+  // Toggling a tool with itself closes it; picking another tool replaces it.
+  activeTool = $state<'inbox' | 'notes' | 'contacts' | 'settings' | null>(null);
+  toggleTool(tool: 'inbox' | 'notes' | 'contacts' | 'settings'): void {
+    this.activeTool = this.activeTool === tool ? null : tool;
+  }
 
   async toggleDurationUnit(): Promise<void> {
     this.durationUnit = this.durationUnit === 'weeks' ? 'days' : 'weeks';
@@ -482,9 +486,6 @@ class Store {
     this.recordHistory(); // seed
     this.hasUnsavedUndo = false;
     this.scrollToToday();
-    // Auto-collapse the jobs sidebar after picking a job — you only need it
-    // when switching jobs. Toggle the floating button to re-open.
-    this.sidebarCollapsed = true;
     await this.runLateTasksTick();
     await this.refreshOverdueReviews();
   }

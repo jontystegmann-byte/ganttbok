@@ -107,7 +107,7 @@
 <aside class="inbox-panel">
   <header class="inbox-header">
     <h2>Inbox</h2>
-    <button class="close-btn" onclick={() => (store.inboxOpen = false)} aria-label="Close inbox">×</button>
+    <button class="close-btn" onclick={() => (store.activeTool = null)} aria-label="Close inbox">×</button>
   </header>
 
   {#if actionError}
@@ -213,7 +213,7 @@
   .inbox-panel {
     position: fixed;
     top: 0; right: 0; bottom: 0;
-    width: 380px;
+    width: 420px;
     background: var(--c-panel);
     border-left: 1px solid var(--c-border);
     z-index: 40;

@@ -86,13 +86,13 @@
   }
 </script>
 
-<div class="page">
+<aside class="page">
   <header>
-    <button class="back" onclick={() => (store.showContactsPage = false)} aria-label="Back">← Back</button>
     <h1>Contacts</h1>
     <button class="help-btn" onclick={() => (showHelp = !showHelp)}>
       {showHelp ? 'Hide' : 'How does this work?'}
     </button>
+    <button class="close-btn" onclick={() => (store.activeTool = null)} aria-label="Close contacts">×</button>
   </header>
 
   {#if showHelp}
@@ -181,15 +181,20 @@
       {/if}
     </section>
   </div>
-</div>
+</aside>
 
 <style>
   .page {
-    position: fixed; inset: 0;
-    background: var(--c-bg);
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: 420px;
+    background: var(--c-panel);
+    border-left: 1px solid var(--c-border);
+    box-shadow: -6px 0 18px rgba(0, 0, 0, 0.08);
     z-index: 70;
+    display: flex;
+    flex-direction: column;
     overflow-y: auto;
-    padding: var(--sp-4) var(--sp-6);
+    padding: var(--sp-3) var(--sp-4);
   }
   header {
     display: flex; align-items: center; gap: var(--sp-3);
@@ -216,7 +221,12 @@
   .help li { margin-bottom: 4px; }
   .help code { font-family: var(--font-mono); background: var(--c-accent-fade); color: var(--c-accent); padding: 1px 6px; border-radius: 3px; }
 
-  .layout { display: grid; grid-template-columns: 380px 1fr; gap: var(--sp-6); }
+  .layout { display: flex; flex-direction: column; gap: var(--sp-3); }
+  .close-btn {
+    background: none; border: none; font-size: 22px; line-height: 1;
+    cursor: pointer; color: var(--c-text-muted); padding: 0 var(--sp-2);
+  }
+  .close-btn:hover { color: var(--c-text); }
 
   section.form, section.list {
     background: var(--c-panel); border: 1px solid var(--c-border);

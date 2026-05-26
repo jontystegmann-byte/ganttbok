@@ -1,11 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { store } from './lib/store.svelte';
-  import Sidebar from './lib/sidebar/Sidebar.svelte';
   import AppHeader from './lib/components/AppHeader.svelte';
   import GanttCanvas from './lib/canvas/GanttCanvas.svelte';
   import DetailsPanel from './lib/details/DetailsPanel.svelte';
-  import SavedIndicator from './lib/footer/SavedIndicator.svelte';
   import PrintOptions from './lib/print/PrintOptions.svelte';
   import Toast from './lib/components/Toast.svelte';
   import RenameBundlePrompt from './lib/components/RenameBundlePrompt.svelte';
@@ -35,29 +33,26 @@
   });
 </script>
 
+
 <div class="app-shell">
   <AppHeader />
   <div class="app-body">
-  <aside class="sidebar" class:collapsed={store.sidebarCollapsed} style="width: {store.sidebarCollapsed ? 44 : store.sidebarWidth}px">
-    <Sidebar />
-  </aside>
+    <main class="canvas-pane">
+      {#if store.currentJob}
+        <GanttCanvas />
+      {:else}
+        <div class="empty-state">
+          <h1><span style="font-weight: 900">BLIK</span> <span style="font-weight: 300; color: var(--c-text-muted)">Plan</span></h1>
+          <p>Pick a job from the dropdown above, or create a new one.</p>
+        </div>
+      {/if}
+    </main>
 
-  <main class="canvas-pane">
-    {#if store.currentJob}
-      <GanttCanvas />
-    {:else}
-      <div class="empty-state">
-        <h1><span style="font-weight: 900">BLIK</span> <span style="font-weight: 300; color: var(--c-text-muted)">Plan</span></h1>
-        <p>Pick a job from the left, or create a new one.</p>
-      </div>
+    {#if store.selection}
+      <aside class="details">
+        <DetailsPanel />
+      </aside>
     {/if}
-  </main>
-
-  {#if store.selection}
-    <aside class="details">
-      <DetailsPanel />
-    </aside>
-  {/if}
   </div>
 
   {#if store.currentJob}
@@ -78,9 +73,8 @@
   {/if}
 </div>
 
-<SavedIndicator />
 <RenameBundlePrompt />
-{#if store.showContactsPage}
+{#if store.activeTool === 'contacts'}
   <ContactsPage />
 {/if}
 <Toast />
@@ -98,22 +92,10 @@
   }
   .app-body {
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: 1fr auto;
     flex: 1;
     min-height: 0;
     overflow: hidden;
-  }
-  .sidebar {
-    border-right: 1px solid var(--c-border);
-    background: var(--c-panel);
-    overflow-y: auto;
-    min-width: 180px;
-    max-width: 480px;
-    transition: width 180ms ease, min-width 180ms ease;
-  }
-  .sidebar.collapsed {
-    min-width: 44px;
-    overflow: visible; /* allow the collapse-button to overflow the right edge */
   }
   .canvas-pane {
     overflow: auto;

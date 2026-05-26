@@ -5,8 +5,9 @@
   import InboxPanel from './InboxPanel.svelte';
   import ConnectToClaude from './ConnectToClaude.svelte';
 
-  /* ---------- Settings popover ---------- */
-  let settingsOpen = $state(false);
+  // Tool panel visibility is driven by the unified store.activeTool.
+  const settingsOpen = $derived(store.activeTool === 'settings');
+  const notesOpen = $derived(store.activeTool === 'notes');
 
   /* ---------- Chaser settings (lazy-loaded when popover opens) ---------- */
   let chaserLoaded = $state(false);
@@ -52,7 +53,6 @@
   });
 
   /* ---------- Notes panel ---------- */
-  let notesOpen = $state(false);
 
   async function saveNotes(phaseId: number, value: string) {
     const phase = store.phases.find((p) => p.id === phaseId);
@@ -72,56 +72,31 @@
 </script>
 
 <div class="header-actions">
-  <button class="icon-btn" onclick={() => (settingsOpen = !settingsOpen)} title="Settings" aria-label="Settings">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="12" cy="12" r="3"/>
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-    </svg>
-  </button>
-
-  <button class="icon-btn" onclick={() => (notesOpen = !notesOpen)} title="Notes" aria-label="Notes">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-      <polyline points="14 2 14 8 20 8"/>
-      <line x1="9" y1="13" x2="15" y2="13"/>
-      <line x1="9" y1="17" x2="15" y2="17"/>
-    </svg>
-  </button>
-
-  <button class="icon-btn" onclick={() => (store.showContactsPage = true)} title="Contacts" aria-label="Contacts">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-      <circle cx="9" cy="7" r="4"/>
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-    </svg>
-  </button>
-
   <button
-    class="icon-btn inbox-btn"
-    class:has-proposals={store.inboxPatches.length > 0}
-    onclick={() => (store.inboxOpen = !store.inboxOpen)}
-    title="Inbox — {store.inboxPatches.length} pending proposal{store.inboxPatches.length === 1 ? '' : 's'}"
-    aria-label="Open Inbox"
+    class="tool-btn inbox-btn"
+    class:active={store.activeTool === 'inbox'}
+    class:has-proposals={store.inboxPatches.length > 0 || store.overdueReviews.length > 0}
+    onclick={() => store.toggleTool('inbox')}
   >
-    <!-- Envelope icon -->
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-      <polyline points="22,6 12,13 2,6"/>
-    </svg>
-    {#if store.inboxPatches.length > 0}
-      <span class="badge">{store.inboxPatches.length}</span>
+    Inbox
+    {#if store.inboxPatches.length + store.overdueReviews.length > 0}
+      <span class="badge">{store.inboxPatches.length + store.overdueReviews.length}</span>
     {/if}
   </button>
+
+  <button class="tool-btn" class:active={store.activeTool === 'notes'} onclick={() => store.toggleTool('notes')}>Notes</button>
+
+  <button class="tool-btn" class:active={store.activeTool === 'contacts'} onclick={() => store.toggleTool('contacts')}>Contacts</button>
+
+  <button class="tool-btn" class:active={store.activeTool === 'settings'} onclick={() => store.toggleTool('settings')}>Settings</button>
 </div>
 
-<!-- ============= Settings popover ============= -->
+<!-- ============= Settings side panel ============= -->
 {#if settingsOpen}
-  <div class="backdrop" onclick={() => (settingsOpen = false)} role="presentation"></div>
-  <div class="popover settings-popover" role="dialog" aria-label="Settings">
+  <aside class="settings-popover" role="dialog" aria-label="Settings">
     <header>
       <h2>Settings</h2>
-      <button class="close" onclick={() => (settingsOpen = false)} aria-label="Close">×</button>
+      <button class="close" onclick={() => (store.activeTool = null)} aria-label="Close">×</button>
     </header>
 
     {#if store.currentJob}
@@ -254,7 +229,7 @@
     <section>
       <ConnectToClaude />
     </section>
-  </div>
+  </aside>
 {/if}
 
 <!-- ============= Notes side panel ============= -->
@@ -264,7 +239,7 @@
       <h2>Notes — {store.currentJob?.name ?? ''}</h2>
       <div class="actions">
         <button onclick={printTodo} title="Print A4 portrait">Print</button>
-        <button onclick={() => (notesOpen = false)} class="close" aria-label="Close">×</button>
+        <button onclick={() => (store.activeTool = null)} class="close" aria-label="Close">×</button>
       </div>
     </header>
 
@@ -293,7 +268,7 @@
   </aside>
 {/if}
 
-{#if store.inboxOpen}
+{#if store.activeTool === 'inbox'}
   <InboxPanel />
 {/if}
 
@@ -301,38 +276,46 @@
   .header-actions {
     display: flex; align-items: center; gap: var(--sp-1);
   }
-  .icon-btn {
-    background: transparent; border: none;
-    padding: var(--sp-1) var(--sp-2);
+  .tool-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    padding: var(--sp-1) var(--sp-3);
     cursor: pointer; border-radius: 4px;
-    color: var(--c-text-muted);
-    font-size: var(--font-size-xs);
-    display: flex; align-items: center;
-    font-family: var(--font-mono);
+    color: var(--c-text);
+    font: inherit;
+    font-size: var(--font-size-sm);
+    display: inline-flex; align-items: center; gap: var(--sp-1);
     position: relative;
   }
-  .icon-btn:hover { background: var(--c-accent-fade); color: var(--c-accent); }
+  .tool-btn:hover { background: var(--c-accent-fade); color: var(--c-accent); }
+  .tool-btn.active {
+    background: var(--c-accent-fade);
+    color: var(--c-accent);
+    border-color: var(--c-accent);
+    font-weight: 600;
+  }
+  .inbox-btn.has-proposals { color: var(--c-accent); font-weight: 600; }
   .inbox-btn .badge {
-    position: absolute; top: -2px; right: -2px;
-    min-width: 14px; height: 14px;
-    border-radius: 7px;
+    min-width: 18px; height: 18px;
+    border-radius: 9px;
     background: var(--c-accent); color: white;
-    font-size: 10px; font-weight: 600;
+    font-size: 11px; font-weight: 600;
     display: flex; align-items: center; justify-content: center;
-    padding: 0 4px;
+    padding: 0 6px;
   }
 
   .close { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--c-text-muted); line-height: 1; padding: 0 var(--sp-2); }
 
   /* ============ Settings popover ============ */
-  .backdrop { position: fixed; inset: 0; background: transparent; z-index: 50; }
   .settings-popover {
-    position: fixed; top: 56px; right: 16px; z-index: 51;
-    background: var(--c-panel); border: 1px solid var(--c-border); border-radius: 8px;
-    min-width: 320px; max-width: 380px;
-    box-shadow: 0 12px 36px rgba(0,0,0,0.18);
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: 420px;
+    background: var(--c-panel);
+    border-left: 1px solid var(--c-border);
+    box-shadow: -6px 0 18px rgba(0, 0, 0, 0.08);
+    z-index: 70;
     display: flex; flex-direction: column;
-    max-height: 75vh; overflow-y: auto;
+    overflow-y: auto;
   }
   .settings-popover header { display: flex; justify-content: space-between; align-items: center; padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--c-border); }
   .settings-popover header h2 { margin: 0; font-size: var(--font-size-base); }
@@ -358,7 +341,7 @@
   /* ============ Notes panel ============ */
   .todo-panel {
     position: fixed; top: 0; right: 0; bottom: 0;
-    width: 360px;
+    width: 420px;
     background: var(--c-panel); border-left: 1px solid var(--c-border);
     z-index: 40;
     display: flex; flex-direction: column;
