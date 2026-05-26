@@ -58,6 +58,50 @@
       hour: '2-digit', minute: '2-digit',
     });
   }
+
+  // ISO YYYY-MM-DD → DD/MM/YYYY
+  function formatDmy(iso: string): string {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
+  }
+
+  // Per-card "Mark Done" picker state — taskId is the open one (null = closed).
+  let pickerOpenFor = $state<number | null>(null);
+  let pickerDate = $state<string>('');
+  let submitting = $state<number | null>(null);
+
+  function openPicker(taskId: number, defaultIso: string) {
+    pickerOpenFor = taskId;
+    pickerDate = defaultIso;
+  }
+  function cancelPicker() {
+    pickerOpenFor = null;
+    pickerDate = '';
+  }
+  async function confirmDone(taskId: number) {
+    if (!pickerDate) return;
+    submitting = taskId;
+    try {
+      await store.resolveOverdueAsDone(taskId, pickerDate);
+      pickerOpenFor = null;
+      pickerDate = '';
+    } catch (e) {
+      actionError = String(e);
+    } finally {
+      submitting = null;
+    }
+  }
+
+  async function markRunningLate(taskId: number) {
+    submitting = taskId;
+    try {
+      await store.resolveOverdueAsRunningLate(taskId);
+    } catch (e) {
+      actionError = String(e);
+    } finally {
+      submitting = null;
+    }
+  }
 </script>
 
 <aside class="inbox-panel">
@@ -70,12 +114,54 @@
     <div class="action-error">{actionError}</div>
   {/if}
 
-  {#if store.inboxPatches.length === 0}
+  <div class="inbox-body">
+
+  {#if store.overdueReviews.length > 0}
+    <section class="review-section">
+      <h3 class="section-title">Tasks needing review</h3>
+      {#each store.overdueReviews as r (r.task_id)}
+        {@const phaseName = store.phases.find(p => p.id === r.phase_id)?.name ?? '—'}
+        <article class="review-card">
+          <div class="review-phase">{phaseName}</div>
+          <div class="review-name">{r.task_name}</div>
+          <div class="review-meta">was due {formatDmy(r.planned_end_date)}</div>
+          {#if pickerOpenFor === r.task_id}
+            <div class="picker-row">
+              <input type="date" bind:value={pickerDate} max={store.todayIso} />
+              <button
+                class="accept-btn"
+                disabled={!pickerDate || submitting === r.task_id}
+                onclick={() => confirmDone(r.task_id)}
+              >{submitting === r.task_id ? 'Saving…' : 'Confirm'}</button>
+              <button class="reject-btn" onclick={cancelPicker}>Cancel</button>
+            </div>
+          {:else}
+            <div class="review-actions">
+              <button
+                class="accept-btn"
+                disabled={submitting === r.task_id}
+                onclick={() => openPicker(r.task_id, r.planned_end_date)}
+              >Mark Done…</button>
+              <button
+                class="reject-btn"
+                disabled={submitting === r.task_id}
+                onclick={() => markRunningLate(r.task_id)}
+              >{submitting === r.task_id ? 'Saving…' : 'Running late'}</button>
+            </div>
+          {/if}
+        </article>
+      {/each}
+    </section>
+  {/if}
+
+  {#if store.inboxPatches.length === 0 && store.overdueReviews.length === 0}
     <div class="empty-state">
-      <p>No proposals pending.</p>
-      <p class="hint">Connect Claude in Settings → Integrations to start sending patches here.</p>
+      <p>Inbox is clear.</p>
+      <p class="hint">Tasks needing a finish-date confirmation show up here. Claude proposals also land here when wired in Settings.</p>
     </div>
-  {:else}
+  {/if}
+
+  {#if store.inboxPatches.length > 0}
     <div class="patch-list">
       {#each store.inboxPatches as patch (patch.id)}
         <article class="patch-card">
@@ -113,7 +199,10 @@
     </div>
   {/if}
 
+  </div>
+
   <footer class="inbox-footer">
+
     <button class="clear-btn" disabled={clearing} onclick={clearResolved}>
       {clearing ? 'Clearing…' : 'Clear resolved'}
     </button>
@@ -185,14 +274,65 @@
     color: var(--c-text-muted);
   }
 
-  .patch-list {
+  .inbox-body {
     flex: 1;
     overflow-y: auto;
+    min-height: 0;
+  }
+
+  .patch-list {
     padding: var(--sp-3) var(--sp-4);
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
   }
+
+  .review-section {
+    padding: var(--sp-3) var(--sp-4) 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+  .section-title {
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--c-text-muted);
+    margin: 0 0 var(--sp-1);
+  }
+  .review-card {
+    border: 1px solid var(--c-border);
+    border-radius: 6px;
+    background: var(--c-bg);
+    padding: var(--sp-2) var(--sp-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+  }
+  .review-phase {
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--c-text-muted);
+  }
+  .review-name { font-weight: 600; font-size: var(--font-size-sm); }
+  .review-meta { font-size: var(--font-size-xs); color: var(--c-text-muted); }
+  .review-actions { display: flex; gap: var(--sp-2); margin-top: var(--sp-1); }
+  .review-actions button { flex: 1; }
+  .picker-row {
+    display: flex;
+    gap: var(--sp-2);
+    margin-top: var(--sp-1);
+    align-items: center;
+  }
+  .picker-row input[type="date"] {
+    flex: 1;
+    padding: var(--sp-1) var(--sp-2);
+    border: 1px solid var(--c-border);
+    border-radius: 4px;
+    font: inherit;
+  }
+  .picker-row button { padding: var(--sp-1) var(--sp-2); }
 
   .patch-card {
     border: 1px solid var(--c-border);

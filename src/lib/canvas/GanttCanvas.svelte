@@ -66,14 +66,16 @@
     ys.push(rows.length * ROW_H); // bottom of the last phase
     return ys;
   });
+
 </script>
 
-<div class="gantt" style="--cell-w: {CELL}px;">
+<div class="gantt" style="--cell-w: {CELL}px; --total-w: {days.length * CELL}px;">
   <DragOverlay />
   <DepCreator />
-  <LeftRail />
-  <div class="grid-area" style="--total-w: {days.length * CELL}px;">
-    <HeaderStrip {days} />
+  <div class="corner"></div>
+  <div class="header-row"><HeaderStrip {days} /></div>
+  <div class="rail-col"><LeftRail /></div>
+  <div class="time-col">
     <div
       class="rows"
       style="height: {totalHeight}px;"
@@ -147,14 +149,39 @@
 <style>
   .gantt {
     display: grid;
-    grid-template-columns: var(--left-rail-width) 1fr;
+    grid-template-columns: var(--left-rail-width) max-content;
+    grid-template-rows: var(--header-height) max-content;
     height: 100%;
-    overflow: hidden;
+    overflow: auto;
+    isolation: isolate; /* contain the sticky elements' z-indexes so they don't beat the AppHeader / InboxPanel */
   }
-  .grid-area {
+  .corner {
+    grid-row: 1; grid-column: 1;
+    position: sticky;
+    top: 0; left: 0;
+    z-index: 30;
+    background: var(--c-panel);
+    border-right: 1px solid var(--c-border);
+    border-bottom: 1px solid var(--c-border-bold);
+  }
+  .header-row {
+    grid-row: 1; grid-column: 2;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--c-panel);
+  }
+  .rail-col {
+    grid-row: 2; grid-column: 1;
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background: var(--c-panel);
+    border-right: 1px solid var(--c-border);
+  }
+  .time-col {
+    grid-row: 2; grid-column: 2;
     position: relative;
-    overflow-x: auto;
-    overflow-y: auto;
   }
   .rows {
     position: relative;

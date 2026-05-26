@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { store } from './lib/store.svelte';
   import Sidebar from './lib/sidebar/Sidebar.svelte';
+  import AppHeader from './lib/components/AppHeader.svelte';
   import GanttCanvas from './lib/canvas/GanttCanvas.svelte';
   import DetailsPanel from './lib/details/DetailsPanel.svelte';
   import SavedIndicator from './lib/footer/SavedIndicator.svelte';
@@ -35,6 +36,8 @@
 </script>
 
 <div class="app-shell">
+  <AppHeader />
+  <div class="app-body">
   <aside class="sidebar" class:collapsed={store.sidebarCollapsed} style="width: {store.sidebarCollapsed ? 44 : store.sidebarWidth}px">
     <Sidebar />
   </aside>
@@ -55,6 +58,7 @@
       <DetailsPanel />
     </aside>
   {/if}
+  </div>
 
   {#if store.currentJob}
     <div class="print-header">
@@ -87,9 +91,16 @@
 
 <style>
   .app-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  .app-body {
     display: grid;
     grid-template-columns: auto 1fr auto;
-    height: 100vh;
+    flex: 1;
+    min-height: 0;
     overflow: hidden;
   }
   .sidebar {

@@ -1,5 +1,5 @@
 import * as ipc from './ipc';
-import type { Job, Phase, Task, Dependency, NoWorkDay, Contact, PendingPatch, TaskStatus } from './types';
+import type { Job, Phase, Task, Dependency, NoWorkDay, Contact, PendingPatch, TaskStatus, OverdueReview } from './types';
 import type { Zone } from './hit-test';
 import { UndoStack, type Snapshot as UndoSnapshot } from './undo';
 
@@ -335,9 +335,63 @@ class Store {
   });
 
   /** Refresh todayIso to the actual current date. Called on bootstrap, focus, and a minute timer. */
+  overdueReviews = $state<OverdueReview[]>([]);
+
+  async refreshOverdueReviews(): Promise<void> {
+    if (!this.currentJob) { this.overdueReviews = []; return; }
+    try {
+      this.overdueReviews = await ipc.listOverdueReviews(this.currentJob.id, this.todayIso);
+    } catch (e) {
+      console.error('refreshOverdueReviews', e);
+    }
+  }
+
+  /** Daily tick — runs on bootstrap + day rollover.
+   *  Backend catch-up extends every Late task in the open job so its bar
+   *  reaches today; idempotent, so safe to run multiple times per day. */
+  async runLateTasksTick(): Promise<void> {
+    if (!this.currentJob) return;
+    try {
+      const extended = await ipc.tickLateTasks(this.currentJob.id, this.todayIso);
+      if (extended > 0) {
+        this.tasks = await ipc.listTasks(this.currentJob.id);
+      }
+    } catch (e) {
+      console.error('runLateTasksTick', e);
+    }
+  }
+
+  /** Mark an overdue task Done on a specific completion date.
+   *  Backend adjusts duration and ripples dependents if auto_shift_dependents is on. */
+  async resolveOverdueAsDone(taskId: number, completionDate: string): Promise<void> {
+    if (!this.currentJob) return;
+    const jobId = this.currentJob.id;
+    await ipc.markTaskDoneOnDate(jobId, taskId, completionDate);
+    this.tasks = await ipc.listTasks(jobId);
+    this.recordHistory();
+    await this.refreshOverdueReviews();
+    await ipc.touchLastSave();
+  }
+
+  /** Flag an overdue task as Running Late. Backend catch-up extends the duration
+   *  so the bar reaches today, then pushes downstream dependents if auto_shift is on. */
+  async resolveOverdueAsRunningLate(taskId: number): Promise<void> {
+    if (!this.currentJob) return;
+    const jobId = this.currentJob.id;
+    await ipc.markTaskRunningLate(jobId, taskId, this.todayIso);
+    this.tasks = await ipc.listTasks(jobId);
+    this.recordHistory();
+    await this.refreshOverdueReviews();
+    await ipc.touchLastSave();
+  }
+
   tickToday(): void {
     const iso = new Date().toISOString().slice(0, 10);
-    if (iso !== this.todayIso) this.todayIso = iso;
+    if (iso !== this.todayIso) {
+      this.todayIso = iso;
+      // Day rolled over: extend any Late bars, then refresh the overdue review list.
+      this.runLateTasksTick().then(() => this.refreshOverdueReviews()).catch(() => {});
+    }
   }
 
   /** Scroll the canvas .grid-area so today's column sits ~1 week from the left visible edge. */
@@ -393,6 +447,10 @@ class Store {
     await this.refreshInbox();
     this.startInboxPoll();
     window.addEventListener('focus', () => this.refreshInbox());
+
+    // Overdue task reviews — recheck on bootstrap and on window focus.
+    await this.refreshOverdueReviews();
+    window.addEventListener('focus', () => this.refreshOverdueReviews());
   }
 
   async refreshSidebar(): Promise<void> {
@@ -427,6 +485,8 @@ class Store {
     // Auto-collapse the jobs sidebar after picking a job — you only need it
     // when switching jobs. Toggle the floating button to re-open.
     this.sidebarCollapsed = true;
+    await this.runLateTasksTick();
+    await this.refreshOverdueReviews();
   }
 
   select(s: Selection): void {
@@ -497,6 +557,7 @@ class Store {
       this.tasks[idx] = { ...this.tasks[idx], status, completion_date: completionDate };
     }
     await ipc.setTaskStatus(taskId, status, completionDate);
+    this.recordHistory();
     await ipc.touchLastSave();
   }
 

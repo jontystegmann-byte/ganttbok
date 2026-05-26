@@ -6,7 +6,7 @@ import type {
   Contact, NudgeResult,
   PendingPatch,
   ClaudeSurface, ClaudeDetectionResult,
-  TaskStatus,
+  TaskStatus, OverdueReview,
 } from './types';
 
 // Jobs
@@ -50,6 +50,18 @@ export const setTaskStatus = (
 
 export const setJobAutoShift = (id: number, enabled: boolean) =>
   invoke<void>('set_job_auto_shift', { id, enabled });
+
+export const listOverdueReviews = (jobId: number, today: string) =>
+  invoke<OverdueReview[]>('list_overdue_reviews', { jobId, today });
+
+export const markTaskDoneOnDate = (jobId: number, taskId: number, completionDate: string) =>
+  invoke<void>('mark_task_done_on_date', { jobId, taskId, completionDate });
+
+export const markTaskRunningLate = (jobId: number, taskId: number, today: string) =>
+  invoke<void>('mark_task_running_late', { jobId, taskId, today });
+
+export const tickLateTasks = (jobId: number, today: string) =>
+  invoke<number>('tick_late_tasks', { jobId, today });
 
 // Dependencies
 export const listDependencies     = (jobId: number)                  => invoke<Dependency[]>('list_dependencies', { jobId });

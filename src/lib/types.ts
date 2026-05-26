@@ -203,6 +203,13 @@ export interface Patch {
 
 export type TaskStatus = 'on_track' | 'done' | 'late';
 
+export interface OverdueReview {
+  task_id: number;
+  task_name: string;
+  phase_id: number;
+  planned_end_date: string;  // YYYY-MM-DD
+}
+
 export type PatchStatus =
   | 'proposed'
   | 'accepted'
