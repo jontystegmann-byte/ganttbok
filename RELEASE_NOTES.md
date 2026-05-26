@@ -1,3 +1,11 @@
+Blik Plan v1.7.2 — Compact header
+
+- Header collapsed back to a single row: logo + Inbox · Notes · Contacts · Settings · Print + saved indicator + version.
+- The job-switcher dropdown moved into the chart's corner cell (top-left, aligned with the week-days header). Picking jobs is right where the task column starts.
+- Empty state (no job selected) centres a job-switcher in the canvas so picking a first job is obvious.
+
+—
+
 Blik Plan v1.7.1 — Fix Claude MCP path
 
 FIX
