@@ -1,3 +1,10 @@
+Blik Plan v1.7.1 — Fix Claude MCP path
+
+FIX
+- The "Connect to Claude" button was writing the wrong sidecar path into Claude's MCP config (Contents/Resources/ instead of Contents/MacOS/), so Claude couldn't actually launch the blikplan MCP server. v1.7.1 resolves the path relative to the running executable so it's always correct on macOS/Linux/Windows. If you previously connected, click Disconnect then Connect again to rewrite the path.
+
+—
+
 Blik Plan v1.7.0 — Live schedule, inbox review, redesigned layout
 
 NEW

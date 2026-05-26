@@ -36,15 +36,17 @@ fn db_path() -> GbResult<PathBuf> {
     Ok(crate::db_path())
 }
 
-fn bundled_mcp_bin_path(app: &tauri::AppHandle) -> GbResult<PathBuf> {
-    // The MCP binary is bundled as a Tauri sidecar resource (see tauri.conf.json
-    // externalBin entry). On macOS this resolves to .app/Contents/Resources;
-    // on Linux/Windows it sits next to the executable.
-    let resource = app
-        .path()
-        .resolve("blikplan-mcp", tauri::path::BaseDirectory::Resource)
-        .map_err(|e| GbError::Validation(format!("could not resolve sidecar path: {e}")))?;
-    Ok(resource)
+fn bundled_mcp_bin_path(_app: &tauri::AppHandle) -> GbResult<PathBuf> {
+    // Tauri externalBin sidecars sit next to the main executable: on macOS that's
+    // .app/Contents/MacOS/blikplan-mcp (NOT Contents/Resources/). Resolve relative
+    // to the running exe so this works whether the user installed via DMG, ran
+    // via `cargo run`, etc.
+    let exe = std::env::current_exe()
+        .map_err(|e| GbError::Validation(format!("could not find current exe: {e}")))?;
+    let dir = exe
+        .parent()
+        .ok_or_else(|| GbError::Validation("current exe has no parent dir".into()))?;
+    Ok(dir.join("blikplan-mcp"))
 }
 
 fn detect_one(
