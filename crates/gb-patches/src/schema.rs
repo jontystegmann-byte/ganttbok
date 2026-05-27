@@ -1,3 +1,4 @@
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// The patch document version. The current MCP server and the Inbox apply
@@ -5,7 +6,7 @@ use serde::{Deserialize, Serialize};
 /// `validate::validate_patch`.
 pub const PATCH_VERSION: u32 = 1;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Patch {
     pub patch_version: u32,
     pub summary: String,
@@ -15,7 +16,7 @@ pub struct Patch {
 /// All operations that may appear inside a patch. Each variant maps to
 /// an existing Tauri command in `commands/*` — Plan 3's apply engine
 /// dispatches accordingly.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum PatchOp {
     AddTask {
@@ -62,7 +63,7 @@ pub enum PatchOp {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(untagged)]
 pub enum TaskRef {
     Existing { task_id: i64 },

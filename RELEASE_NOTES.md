@@ -1,3 +1,11 @@
+Blik Plan v1.7.3 — Fix Claude patch proposals
+
+FIX
+- The `propose_patch` MCP tool rejected every patch coming from Claude with a "parse_error" because Claude sends the patch document as a JSON string while the server expected an object. The server now accepts both encodings, and the tool advertises the full patch schema so Claude builds valid patches directly. Patches sent from Claude land in your Inbox as expected.
+- Error details from `propose_patch` are now properly JSON-escaped (previously a quote inside an error message could produce malformed JSON).
+
+—
+
 Blik Plan v1.7.2 — Compact header
 
 - Header collapsed back to a single row: logo + Inbox · Notes · Contacts · Settings · Print + saved indicator + version.

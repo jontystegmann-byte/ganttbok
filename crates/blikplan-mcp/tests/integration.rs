@@ -363,6 +363,65 @@ async fn propose_patch_rejects_invalid_patch() {
 }
 
 #[tokio::test]
+async fn propose_patch_accepts_stringified_patch() {
+    // Regression: the Claude Code MCP client serialises the untyped `patch`
+    // argument as a JSON-encoded *string* rather than an object. The server
+    // must tolerate that and must store a proper object in patch_json so the
+    // inbox apply engine (which does from_str::<Patch>) can read it back.
+    use std::sync::{Arc, Mutex};
+    use blikplan_mcp::server::BlikPlanServer;
+    use tempfile::NamedTempFile;
+
+    let tmp = NamedTempFile::new().unwrap();
+    {
+        let rw = rusqlite::Connection::open(tmp.path()).unwrap();
+        rw.execute_batch(blikplan_mcp::db::FIXTURE_SCHEMA_FOR_TEST).unwrap();
+        rw.execute_batch(
+            "INSERT INTO job (name, project_start_date, region) VALUES ('J', '2026-01-01', 'ZA');"
+        ).unwrap();
+    }
+    let ro = blikplan_mcp::db::open_ro(tmp.path());
+    let server = BlikPlanServer::new_with_path(Arc::new(Mutex::new(ro)), tmp.path().to_path_buf());
+    let (server_transport, client_transport) = tokio::io::duplex(4096);
+    tokio::spawn(async move {
+        if let Ok(running) = server.serve(server_transport).await {
+            let _ = running.waiting().await;
+        }
+    });
+    let client = ClientInfo::default().serve(client_transport).await.unwrap();
+
+    let patch_obj = serde_json::json!({
+        "patch_version": 1,
+        "summary": "Add note from meeting",
+        "ops": [{ "op": "append_note", "job_id": 1, "text": "stringified path" }]
+    });
+    // The bug: patch arrives as a String, not an object.
+    let result = client.call_tool(rmcp::model::CallToolRequestParam {
+        name: "propose_patch".into(),
+        arguments: Some(serde_json::json!({
+            "job_id": 1,
+            "patch": patch_obj.to_string(),
+            "summary": "Add note from meeting"
+        }).as_object().unwrap().clone()),
+    }).await.unwrap();
+    let text = result.content.first()
+        .and_then(|c| c.raw.as_text())
+        .map(|t| t.text.as_str())
+        .unwrap_or("");
+    let val: serde_json::Value = serde_json::from_str(text).unwrap();
+    assert!(val.get("patch_id").is_some(), "expected patch_id: {text}");
+
+    // The stored patch_json must be a proper object that round-trips to Patch.
+    let conn = rusqlite::Connection::open(tmp.path()).unwrap();
+    let stored: String = conn.query_row(
+        "SELECT patch_json FROM pending_patches LIMIT 1", [], |r| r.get(0)
+    ).unwrap();
+    let parsed: Result<gb_patches::Patch, _> = serde_json::from_str(&stored);
+    assert!(parsed.is_ok(), "stored patch_json must round-trip to Patch, got: {stored}");
+    client.cancel().await.unwrap();
+}
+
+#[tokio::test]
 async fn today_with_overdue_task_is_returned() {
     // Insert a task with start_date in the past.
     let db = {
