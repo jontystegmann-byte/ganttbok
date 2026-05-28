@@ -34,7 +34,5 @@ export function computeGhostDate(args: ComputeGhostArgs): string {
   const colsMoved = pxDeltaToColsMoved(pxDelta, cellW);
   const candidateIdx = Math.max(0, Math.min(days.length - 1, idxAtStart + colsMoved));
   const candidate = days[candidateIdx].date;
-  // Tasks never start on a weekend day, even when weekend columns are visible.
-  // Pass includeWeekends=false so weekends are always treated as non-workable for placement.
-  return snapToNearestWorkable(candidate, noWorkSet, false);
+  return snapToNearestWorkable(candidate, noWorkSet, includeWeekends);
 }

@@ -45,19 +45,34 @@ describe('computeGhostDate', () => {
     expect(ghost).toBe('2026-06-12');
   });
 
-  it('skips weekend cells when weekends are visible', () => {
-    // Days list includes Sat/Sun visually; landing on a weekend snaps to nearest workable.
+  it('with includeWeekends=true, Saturday IS workable and is not snapped', () => {
+    // includeWeekends=true means the project works weekends; Sat is a valid bar start.
     const daysWithWknd = mkDays([
       '2026-06-12', // Fri
       '2026-06-13', // Sat
       '2026-06-14', // Sun
       '2026-06-15', // Mon
     ]);
-    // pxDelta = 2*24 = 48 from Fri → 2 columns right = Sun. Snap nearest workable = Mon (1 fwd vs Fri 2 back).
     const ghost = computeGhostDate({
-      originalStart: '2026-06-12', pxDelta: 48, cellW: 24, days: daysWithWknd, noWorkSet: noWork, includeWeekends: true,
+      originalStart: '2026-06-12', pxDelta: 24, cellW: 24,
+      days: daysWithWknd, noWorkSet: new Set(), includeWeekends: true,
     });
-    expect(ghost).toBe('2026-06-15');
+    expect(ghost).toBe('2026-06-13');
+  });
+
+  it('with includeWeekends=true and Sat in noWorkSet, snaps off Sat', () => {
+    // Even in weekend-working mode, a specific Saturday flagged as no-work should snap away.
+    const daysWithWknd = mkDays([
+      '2026-06-12', // Fri
+      '2026-06-13', // Sat (flagged no-work)
+      '2026-06-14', // Sun
+      '2026-06-15', // Mon
+    ]);
+    const ghost = computeGhostDate({
+      originalStart: '2026-06-12', pxDelta: 24, cellW: 24,
+      days: daysWithWknd, noWorkSet: new Set(['2026-06-13']), includeWeekends: true,
+    });
+    expect(ghost).toBe('2026-06-14'); // Sun is the nearest workable (1 fwd vs Fri 1 back; ties go fwd)
   });
 
   it('skips a no-work day (e.g. ZA Freedom Day 27 Apr 2026)', () => {
