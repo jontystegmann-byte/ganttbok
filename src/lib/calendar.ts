@@ -45,6 +45,35 @@ export function addCalendarDays(iso: string, n: number): string {
   return fmt(d);
 }
 
+/**
+ * Snap an ISO date to the nearest workable day, looking ±90 days symmetrically.
+ * "Workable" means: weekend-skipped iff !includeWeekends, AND not in noWorkSet.
+ * Returns the original date if no workable day is found in range (defensive — never throws).
+ */
+export function snapToNearestWorkable(
+  iso: string,
+  noWorkSet: Set<string>,
+  includeWeekends: boolean,
+): string {
+  const isWorkable = (candidate: string): boolean => {
+    const d = parse(candidate);
+    if (!includeWeekends && !isMonFri(d)) return false;
+    if (noWorkSet.has(candidate)) return false;
+    return true;
+  };
+  if (isWorkable(iso)) return iso;
+  for (let delta = 1; delta <= 90; delta++) {
+    const forward = addCalendarDays(iso, delta);
+    const backward = addCalendarDays(iso, -delta);
+    const fwdOk = isWorkable(forward);
+    const bwdOk = isWorkable(backward);
+    if (fwdOk && bwdOk) return forward; // ties go forward (matches user "next workday" intuition)
+    if (fwdOk) return forward;
+    if (bwdOk) return backward;
+  }
+  return iso;
+}
+
 export function addWorkdays(iso: string, n: number, includeWeekends: boolean = false): string {
   const d = parse(iso);
   const snapDir = n >= 0 ? 1 : -1;

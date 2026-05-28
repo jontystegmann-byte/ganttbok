@@ -2,7 +2,7 @@ use chrono::{NaiveDate, Duration, Datelike};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 use crate::commands::Db;
-use crate::db::models::{Task, NewTask, TaskStatus};
+use crate::db::models::{Task, NewTask, TaskStatus, meta_get};
 use crate::repo::task as task_repo;
 use crate::repo::no_work_day as nwd_repo;
 use crate::repo::dependency as dep_repo;
@@ -81,6 +81,8 @@ pub(crate) fn list_overdue_reviews_inner(
     job_id: i64,
     today: NaiveDate,
 ) -> GbResult<Vec<OverdueReview>> {
+    let include_weekends = meta_get(conn, "include_weekends")
+        .ok().flatten().map(|s| s == "1").unwrap_or(false);
     let tasks = task_repo::list_for_job(conn, job_id)?;
     let nwds: std::collections::HashSet<NaiveDate> = nwd_repo::list_for_job(conn, job_id)
         .unwrap_or_default()
@@ -91,7 +93,7 @@ pub(crate) fn list_overdue_reviews_inner(
     let mut out = Vec::new();
     for t in tasks {
         if t.status == TaskStatus::Done { continue; }
-        let end = add_workdays_excluding(t.start_date, (t.duration_workdays - 1).max(0), &nwds);
+        let end = add_workdays_excluding(t.start_date, (t.duration_workdays - 1).max(0), &nwds, include_weekends);
         if end < today {
             out.push(OverdueReview {
                 task_id: t.id,
@@ -126,6 +128,8 @@ pub(crate) fn mark_task_done_on_date_inner(
     task_id: i64,
     completion_date: NaiveDate,
 ) -> GbResult<()> {
+    let include_weekends = meta_get(conn, "include_weekends")
+        .ok().flatten().map(|s| s == "1").unwrap_or(false);
     let mut task = task_repo::get(conn, task_id)?;
     let job = job_repo::get(conn, job_id)?;
     let nwds: std::collections::HashSet<NaiveDate> = nwd_repo::list_for_job(conn, job_id)
@@ -135,7 +139,7 @@ pub(crate) fn mark_task_done_on_date_inner(
         .collect();
 
     let old_duration = task.duration_workdays;
-    let new_duration = workdays_inclusive(task.start_date, completion_date, &nwds).max(1);
+    let new_duration = workdays_inclusive(task.start_date, completion_date, &nwds, include_weekends).max(1);
     let shift: i64 = new_duration - old_duration;
 
     task.status = TaskStatus::Done;
@@ -146,7 +150,7 @@ pub(crate) fn mark_task_done_on_date_inner(
     if shift != 0 && job.auto_shift_dependents {
         let tasks = task_repo::list_for_job(conn, job_id)?;
         let deps = dep_repo::list_for_job(conn, job_id)?;
-        let shifts = compute_ripple(&tasks, &deps, task_id, shift, &nwds);
+        let shifts = compute_ripple(&tasks, &deps, task_id, shift, &nwds, include_weekends);
         for (id, new_start) in shifts {
             let mut t = task_repo::get(conn, id)?;
             t.start_date = new_start;
@@ -177,6 +181,8 @@ pub(crate) fn mark_task_running_late_inner(
     task_id: i64,
     today: NaiveDate,
 ) -> GbResult<()> {
+    let include_weekends = meta_get(conn, "include_weekends")
+        .ok().flatten().map(|s| s == "1").unwrap_or(false);
     let mut task = task_repo::get(conn, task_id)?;
     let job = job_repo::get(conn, job_id)?;
     let nwds: std::collections::HashSet<NaiveDate> = nwd_repo::list_for_job(conn, job_id)
@@ -186,9 +192,9 @@ pub(crate) fn mark_task_running_late_inner(
         .collect();
 
     let old_duration = task.duration_workdays;
-    let old_end = add_workdays_excluding(task.start_date, (old_duration - 1).max(0), &nwds);
+    let old_end = add_workdays_excluding(task.start_date, (old_duration - 1).max(0), &nwds, include_weekends);
     let new_end = if today > old_end { today } else { old_end };
-    let new_duration = workdays_inclusive(task.start_date, new_end, &nwds).max(1);
+    let new_duration = workdays_inclusive(task.start_date, new_end, &nwds, include_weekends).max(1);
     let shift: i64 = new_duration - old_duration;
 
     task.status = TaskStatus::Late;
@@ -199,7 +205,7 @@ pub(crate) fn mark_task_running_late_inner(
     if shift > 0 && job.auto_shift_dependents {
         let tasks = task_repo::list_for_job(conn, job_id)?;
         let deps = dep_repo::list_for_job(conn, job_id)?;
-        let shifts = compute_ripple(&tasks, &deps, task_id, shift, &nwds);
+        let shifts = compute_ripple(&tasks, &deps, task_id, shift, &nwds, include_weekends);
         for (id, new_start) in shifts {
             let mut t = task_repo::get(conn, id)?;
             t.start_date = new_start;
@@ -244,16 +250,16 @@ pub(crate) fn tick_late_tasks_inner(
 }
 
 /// Count workdays between `start` and `end` inclusive, respecting `excluded`
-/// (no-work days). Returns 0 if `end < start`.
+/// (no-work days) and the `include_weekends` flag. Returns 0 if `end < start`.
 fn workdays_inclusive(
     start: NaiveDate,
     end: NaiveDate,
     excluded: &std::collections::HashSet<NaiveDate>,
+    include_weekends: bool,
 ) -> i64 {
     if end < start { return 0; }
     let is_work = |d: NaiveDate| {
-        use chrono::Weekday::*;
-        !matches!(d.weekday(), Sat | Sun) && !excluded.contains(&d)
+        crate::calendar::workday::is_workday(d, include_weekends) && !excluded.contains(&d)
     };
     let mut cur = start;
     let mut n: i64 = 0;

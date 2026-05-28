@@ -95,7 +95,11 @@ pub fn run_auto_nudges(conn: &Connection, today: NaiveDate) -> Vec<NudgeResult> 
             .collect();
         let nwds_set: std::collections::HashSet<NaiveDate> = nwds_iso.into_iter().collect();
 
-        let end = add_workdays_excluding(task.start_date, task.duration_workdays - 1, &nwds_set);
+        let include_weekends = meta_get(conn, "include_weekends")
+            .ok().flatten()
+            .map(|s| s == "1")
+            .unwrap_or(false);
+        let end = add_workdays_excluding(task.start_date, task.duration_workdays - 1, &nwds_set, include_weekends);
         let days_to_deadline = (end - today).num_days();
 
         let (template, template_key) = if days_to_deadline >= 0 && days_to_deadline <= threshold {

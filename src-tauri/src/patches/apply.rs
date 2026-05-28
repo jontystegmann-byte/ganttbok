@@ -12,7 +12,7 @@ use chrono::{NaiveDate, Utc};
 use rusqlite::{Connection, params};
 
 use crate::commands::drag::apply_ripple;
-use crate::db::models::{NewTask, NewDependency};
+use crate::db::models::{NewTask, NewDependency, meta_get};
 use crate::patches::schema::{Patch, PatchOp, TaskRef};
 use crate::repo::{contact as contact_repo, dependency as dep_repo, job as job_repo, task as task_repo};
 use crate::{GbError, GbResult};
@@ -155,7 +155,8 @@ fn apply_shift_task(conn: &Connection, op: &PatchOp) -> GbResult<()> {
         other => GbError::Sqlite(other),
     })?;
 
-    apply_ripple(conn, job_id, task_id, by_days)
+    let include_weekends = meta_get(conn, "include_weekends")?.as_deref() == Some("1");
+    apply_ripple(conn, job_id, task_id, by_days, include_weekends)
 }
 
 fn apply_add_dependency(

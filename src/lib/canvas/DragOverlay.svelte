@@ -1,33 +1,71 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { store } from '../store.svelte';
-  import { magneticSnap } from '../snap';
   import { addWorkdays } from '../calendar';
+  import type { ViewportDay } from '../calendar';
+  import { computeGhostDate } from './drag-physics';
   import * as ipc from '../ipc';
 
-  const CELL = 24;
+  let { cellW, days }: { cellW: number; days: ViewportDay[] } = $props();
+
+  /** Effective no-work set: holidays only block when the per-job flag is on. */
+  function effectiveNoWorkSet(): Set<string> {
+    if (!store.currentJob?.holidays_block_work) return new Set<string>();
+    return new Set(store.noWorkDays.map(n => n.date));
+  }
+
+  /** Count workdays between two ISO dates (signed; respects no-work + weekend flag). */
+  function workdaysBetween(startIso: string, endIso: string, noWork: Set<string>, incWknd: boolean): number {
+    if (startIso === endIso) return 0;
+    const forward = endIso > startIso;
+    let cur = startIso;
+    let count = 0;
+    let guard = 0;
+    while (cur !== endIso && guard < 10_000) {
+      cur = addWorkdays(cur, forward ? 1 : -1, incWknd);
+      while (noWork.has(cur) && cur !== endIso) {
+        cur = addWorkdays(cur, forward ? 1 : -1, incWknd);
+      }
+      count += forward ? 1 : -1;
+      guard++;
+    }
+    return count;
+  }
+
+  function ghostFor(originalStart: string, liveDelta: number): string {
+    return computeGhostDate({
+      originalStart,
+      pxDelta: liveDelta,
+      cellW,
+      days,
+      noWorkSet: effectiveNoWorkSet(),
+      includeWeekends: store.includeWeekends,
+    });
+  }
 
   function onPointerMove(e: PointerEvent) {
     if (!store.dragState) return;
-    const rawDelta = e.clientX - store.dragState.startX;
-    const snapped = magneticSnap({ pxDelta: rawDelta, cellW: CELL });
-    store.dragState.liveDelta = snapped;
+    // Free 1:1 pixel tracking — no snap during preview.
+    store.dragState.liveDelta = e.clientX - store.dragState.startX;
   }
 
   async function onPointerUp(_e: PointerEvent) {
     const d = store.dragState;
     if (!d) return;
-    const deltaWorkdays = Math.round(d.liveDelta / CELL);
     store.dragState = null;
-    if (deltaWorkdays === 0) return;
     if (!store.currentJob) return;
+    const noWork = effectiveNoWorkSet();
 
+    // Phase drag: shift every task in the phase by the same workday delta.
     if (d.taskId < 0) {
-      // Phase drag — shift every task in the phase.
       const phaseId = -d.taskId;
       const phaseTasks = store.tasksByPhase.get(phaseId) ?? [];
+      if (phaseTasks.length === 0) return;
+      const ghost = ghostFor(d.originalStart, d.liveDelta);
+      if (ghost === d.originalStart) return;
+      const wkDelta = workdaysBetween(d.originalStart, ghost, noWork, store.includeWeekends);
       for (const t of phaseTasks) {
-        const newStart = addWorkdays(t.start_date, deltaWorkdays);
+        const newStart = addWorkdays(t.start_date, wkDelta, store.includeWeekends);
         await ipc.dragTask({
           job_id: store.currentJob.id,
           task_id: t.id,
@@ -35,7 +73,6 @@
         });
       }
       await ipc.touchLastSave();
-      // Reload state from backend to pick up all ripples.
       await store.openJob(store.currentJob.id);
       return;
     }
@@ -44,22 +81,30 @@
     if (!task) return;
 
     if (d.zone === 'move') {
-      const newStart = addWorkdays(d.originalStart, deltaWorkdays);
+      const ghost = ghostFor(d.originalStart, d.liveDelta);
+      if (ghost === d.originalStart) return;
       const result = await ipc.dragTask({
         job_id: store.currentJob.id,
         task_id: d.taskId,
-        new_start_date: newStart,
+        new_start_date: ghost,
       });
       store.applyDragResult(result.updated_tasks);
     } else if (d.zone === 'resize-end') {
-      const newDur = Math.max(1, d.originalDuration + deltaWorkdays);
+      // Treat the bar's end as the drag origin: snap the end column, then derive new duration.
+      const originalEnd = addWorkdays(d.originalStart, Math.max(0, d.originalDuration - 1), store.includeWeekends);
+      const ghostEnd = ghostFor(originalEnd, d.liveDelta);
+      if (ghostEnd === originalEnd) return;
+      const wkDelta = workdaysBetween(originalEnd, ghostEnd, noWork, store.includeWeekends);
+      const newDur = Math.max(1, d.originalDuration + wkDelta);
       const updated = { ...task, duration_workdays: newDur };
       await ipc.updateTask($state.snapshot(updated));
       store.tasks = store.tasks.map(t => t.id === task.id ? updated : t);
     } else if (d.zone === 'resize-start') {
-      const newStart = addWorkdays(d.originalStart, deltaWorkdays);
-      const newDur = Math.max(1, d.originalDuration - deltaWorkdays);
-      const updated = { ...task, start_date: newStart, duration_workdays: newDur };
+      const ghostStart = ghostFor(d.originalStart, d.liveDelta);
+      if (ghostStart === d.originalStart) return;
+      const wkDelta = workdaysBetween(d.originalStart, ghostStart, noWork, store.includeWeekends);
+      const newDur = Math.max(1, d.originalDuration - wkDelta);
+      const updated = { ...task, start_date: ghostStart, duration_workdays: newDur };
       await ipc.updateTask($state.snapshot(updated));
       store.tasks = store.tasks.map(t => t.id === task.id ? updated : t);
     }
