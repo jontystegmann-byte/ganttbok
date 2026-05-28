@@ -1,3 +1,20 @@
+Blik Plan v1.8.0 — Drag physics rewrite
+
+FIX
+- Dragging a long bar no longer "snaps further than where you released." The bar now follows the pointer 1:1 in raw pixels, and a 1px red ghost marker shows the workday it will commit to. Release lands on the ghost — no end-of-drag jump.
+- Dragging across a visible weekend no longer silently costs an extra workday or two. Pixel-to-workday now respects which calendar dates actually have columns in the timeline.
+- Dragging onto a public holiday now snaps to the nearest workable day (forward in ties), respecting the per-job "Holidays block work" flag and the active region.
+- Cell width is now read from the canvas instead of a hard-coded 24px constant, so any future zoom won't desynchronise drag from rendering.
+
+UNDER THE HOOD
+- New `src/lib/canvas/timeline.ts` pure module owns pixel↔date conversion driven by the rendered `ViewportDay[]`.
+- New `src/lib/canvas/drag-physics.ts` module owns the ghost-date computation (`computeGhostDate`).
+- New `calendar.snapToNearestWorkable(iso, noWorkSet, includeWeekends)` helper. Symmetric ±90-day search; ties go forward.
+- Removed `src/lib/snap.ts` (magneticSnap) and its dead `absFrac > 0.5` branch.
+- 25 new unit tests across calendar, timeline, and drag-physics.
+
+—
+
 Blik Plan v1.7.3 — Fix Claude patch proposals
 
 FIX
