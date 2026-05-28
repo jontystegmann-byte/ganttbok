@@ -12,9 +12,17 @@
   import DependencyArrow from './DependencyArrow.svelte';
   import DragOverlay from './DragOverlay.svelte';
   import DepCreator from './DepCreator.svelte';
-  import { computeViewportDays } from '../calendar';
+  import GhostMarker from './GhostMarker.svelte';
+  import { computeViewportDays, addWorkdays } from '../calendar';
+  import { computeGhostDate } from './drag-physics';
+  import { dateToPx } from './timeline';
   import type { Phase, Task } from '../types';
   import * as ipc from '../ipc';
+
+  function computeOriginalEnd(start: string, duration: number): string {
+    // Last occupied workday of a duration-N task = start + (N-1) workdays.
+    return addWorkdays(start, Math.max(0, duration - 1), store.includeWeekends);
+  }
 
   const days = $derived.by(() => {
     if (!store.currentJob) return [];
@@ -45,7 +53,7 @@
   });
 
   const ROW_H = 32;
-  const CELL = 24;
+  const cellW = 24;
   const totalHeight = $derived(rows.length * ROW_H);
 
   const rowIndexMap = $derived.by(() => {
@@ -68,10 +76,54 @@
     return ys;
   });
 
+  /** Effective no-work set when dragging: respects the per-job holidays_block_work flag. */
+  const dragNoWorkSet = $derived.by(() => {
+    if (!store.currentJob?.holidays_block_work) return new Set<string>();
+    return new Set(store.noWorkDays.map(n => n.date));
+  });
+
+  /** Row index of the bar being dragged (handles taskId < 0 = phase sentinel). */
+  function rowIndexForDrag(taskId: number): number | undefined {
+    if (taskId >= 0) return rowIndexMap.get(taskId);
+    const phaseId = -taskId;
+    const idx = rows.findIndex(r => r.kind === 'phase' && r.phase.id === phaseId);
+    return idx >= 0 ? idx : undefined;
+  }
+
+  /** Ghost geometry derived from the live drag state. Returns null when nothing to draw. */
+  const ghostGeom = $derived.by((): { x: number; top: number; height: number } | null => {
+    const d = store.dragState;
+    if (!d) return null;
+
+    let originRef: string;
+    if (d.zone === 'resize-end') {
+      originRef = computeOriginalEnd(d.originalStart, d.originalDuration);
+    } else {
+      originRef = d.originalStart;
+    }
+
+    const ghost = computeGhostDate({
+      originalStart: originRef,
+      pxDelta: d.liveDelta,
+      cellW,
+      days,
+      noWorkSet: dragNoWorkSet,
+      includeWeekends: store.includeWeekends,
+    });
+    if (ghost === originRef) return null; // hide when commit delta is 0
+
+    const x = dateToPx(ghost, cellW, days);
+    if (x < 0) return null;
+
+    const rowIdx = rowIndexForDrag(d.taskId);
+    if (rowIdx === undefined || rowIdx < 0) return null;
+    return { x, top: rowIdx * ROW_H, height: ROW_H };
+  });
+
 </script>
 
-<div class="gantt" style="--cell-w: {CELL}px; --total-w: {days.length * CELL}px;">
-  <DragOverlay />
+<div class="gantt" style="--cell-w: {cellW}px; --total-w: {days.length * cellW}px;">
+  <DragOverlay {cellW} {days} />
   <DepCreator />
   <div class="corner"><JobSwitcher /></div>
   <div class="header-row"><HeaderStrip {days} /></div>
@@ -89,11 +141,11 @@
       onpointerleave={() => { store.hoveredDayIndex = null; }}
     >
       <NoWorkColumn {days} {totalHeight} />
-      <WeekGridLines {days} {totalHeight} cellWidth={CELL} />
-      <HoverColumn {totalHeight} cellWidth={CELL} />
-      <TodayLine {days} {totalHeight} cellWidth={CELL} />
+      <WeekGridLines {days} {totalHeight} cellWidth={cellW} />
+      <HoverColumn {totalHeight} cellWidth={cellW} />
+      <TodayLine {days} {totalHeight} cellWidth={cellW} />
       <svg
-        width={days.length * CELL}
+        width={days.length * cellW}
         height={totalHeight}
         class="canvas-svg"
         onclick={() => store.select(null)}
@@ -101,7 +153,7 @@
           const svgRect = (e.currentTarget as SVGElement).getBoundingClientRect();
           const x = e.clientX - svgRect.left;
           const y = e.clientY - svgRect.top;
-          const dayIdx = Math.floor(x / CELL);
+          const dayIdx = Math.floor(x / cellW);
           const rowIdx = Math.floor(y / ROW_H);
           if (dayIdx < 0 || dayIdx >= days.length) return;
           if (rowIdx < 0 || rowIdx >= rows.length) return;
@@ -137,11 +189,14 @@
         {#each phaseDividerYs as dy}
           <line
             x1="0" y1={dy}
-            x2={days.length * CELL} y2={dy}
+            x2={days.length * cellW} y2={dy}
             stroke="#4B5563" stroke-width="1"
             pointer-events="none"
           />
         {/each}
+        {#if ghostGeom}
+          <GhostMarker x={ghostGeom.x} top={ghostGeom.top} height={ghostGeom.height} />
+        {/if}
       </svg>
     </div>
   </div>
