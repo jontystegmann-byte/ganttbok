@@ -1,3 +1,10 @@
+Blik Plan v1.8.1 — Fix new-job modal not appearing
+
+FIX
+- Clicking "+ New job" in the job-switcher dropdown now actually opens the modal. Since the v1.7 layout redesign the modal was being rendered inside the gantt canvas's isolated stacking context, so it was buried behind the rest of the app. Lifted the modal mount to App.svelte so it renders at the top level.
+
+—
+
 Blik Plan v1.8.0 — Drag physics rewrite
 
 FIX

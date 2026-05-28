@@ -9,6 +9,7 @@
   import Toast from './lib/components/Toast.svelte';
   import RenameBundlePrompt from './lib/components/RenameBundlePrompt.svelte';
   import ContactsPage from './lib/contacts/ContactsPage.svelte';
+  import NewJobModal from './lib/sidebar/NewJobModal.svelte';
 
   onMount(async () => {
     await store.bootstrap();
@@ -83,6 +84,10 @@
 
 {#if store.showPrintOptions}
   <PrintOptions />
+{/if}
+
+{#if store.showNewJobModal}
+  <NewJobModal />
 {/if}
 
 <style>

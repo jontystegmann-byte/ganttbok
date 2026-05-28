@@ -4,8 +4,6 @@
   import JobItem from './JobItem.svelte';
   import TemplatesGroup from './TemplatesGroup.svelte';
   import ArchivedGroup from './ArchivedGroup.svelte';
-  import NewJobModal from './NewJobModal.svelte';
-
   let open = $state(false);
   let triggerEl = $state<HTMLButtonElement | null>(null);
   let menuPos = $state<{ left: number; top: number; width: number }>({ left: 0, top: 0, width: 280 });
@@ -69,10 +67,6 @@
       </button>
     </footer>
   </div>
-{/if}
-
-{#if store.showNewJobModal}
-  <NewJobModal />
 {/if}
 
 <style>
