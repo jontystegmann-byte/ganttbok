@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeViewportDays, addCalendarDays, addWorkdays } from '../calendar';
+import { computeViewportDays, addCalendarDays, addWorkdays, snapToNearestWorkable } from '../calendar';
 import type { Task } from '../types';
 
 describe('calendar', () => {
@@ -47,5 +47,46 @@ describe('calendar', () => {
   it('addCalendarDays advances literally', () => {
     expect(addCalendarDays('2026-06-08', 1)).toBe('2026-06-09');
     expect(addCalendarDays('2026-06-08', 7)).toBe('2026-06-15');
+  });
+});
+
+describe('snapToNearestWorkable', () => {
+  it('returns the date itself when already workable', () => {
+    // Wed 2026-06-10 is a workday; not in noWorkSet.
+    expect(snapToNearestWorkable('2026-06-10', new Set(), false)).toBe('2026-06-10');
+  });
+
+  it('snaps Saturday to the nearest Friday (weekends excluded)', () => {
+    // Sat 2026-06-13 — nearest workable is Fri 2026-06-12 (1 day back, vs Mon = 2 forward).
+    expect(snapToNearestWorkable('2026-06-13', new Set(), false)).toBe('2026-06-12');
+  });
+
+  it('snaps Sunday to the nearest Monday (weekends excluded)', () => {
+    // Sun 2026-06-14 — Mon 2026-06-15 is 1 forward, Fri 2026-06-12 is 2 back. Mon wins.
+    expect(snapToNearestWorkable('2026-06-14', new Set(), false)).toBe('2026-06-15');
+  });
+
+  it('skips a no-work day to the nearest workable date', () => {
+    // ZA Freedom Day 2026-04-27 is a Monday.
+    // Nearest workable: Tue 2026-04-28 (1 forward) vs Fri 2026-04-24 (3 back). Tue wins.
+    const noWork = new Set(['2026-04-27']);
+    expect(snapToNearestWorkable('2026-04-27', noWork, false)).toBe('2026-04-28');
+  });
+
+  it('treats Saturday as workable when includeWeekends is true', () => {
+    expect(snapToNearestWorkable('2026-06-13', new Set(), true)).toBe('2026-06-13');
+  });
+
+  it('returns the date unchanged for dates outside ±90 days walk', () => {
+    // No workable day within 90 days — defensive fallback. Construct by marking everything.
+    const noWork = new Set<string>();
+    const start = '2026-06-10';
+    // Mark 200 days around start as no-work; weekends already excluded.
+    for (let i = -200; i <= 200; i++) {
+      const [y, m, d] = start.split('-').map(Number);
+      const dt = new Date(Date.UTC(y, m - 1, d + i));
+      noWork.add(dt.toISOString().slice(0, 10));
+    }
+    expect(snapToNearestWorkable(start, noWork, false)).toBe(start);
   });
 });
