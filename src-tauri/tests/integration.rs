@@ -17,6 +17,7 @@ fn full_job_lifecycle_with_template_drag_and_sa_sync() {
         project_start_date: NaiveDate::from_ymd_opt(2026,1,1).unwrap(),
         is_template: true, holidays_block_work: true,
             region: "ZA".into(),
+        auto_shift_dependents: true,
     }).unwrap();
     let p1 = phase::create(&conn, &NewPhase {
         job_id: tmpl.id, name: "Plumbing".into(), colour: "#3B82F6".into(),
@@ -48,6 +49,7 @@ fn full_job_lifecycle_with_template_drag_and_sa_sync() {
         name: "Sea Point".into(), client: Some("M. Botha".into()), address: None,
         project_start_date: project_start, is_template: false, holidays_block_work: true,
             region: "ZA".into(),
+        auto_shift_dependents: true,
     }).unwrap();
     for p in phase::list_for_job(&conn, tmpl.id).unwrap() {
         let np = phase::create(&conn, &NewPhase {
@@ -89,11 +91,11 @@ fn full_job_lifecycle_with_template_drag_and_sa_sync() {
     let nwds: HashSet<NaiveDate> = no_work_day::list_for_job(&conn, new_job.id).unwrap()
         .into_iter().map(|n| n.date).collect();
 
-    let ripple = compute_ripple(&tasks, &deps, first.id, 2, &nwds);
+    let ripple = compute_ripple(&tasks, &deps, first.id, 2, &nwds, false);
     assert_eq!(ripple.len(), 2, "two downstream tasks expected");
     assert_eq!(*ripple.get(&second.id).unwrap(), NaiveDate::from_ymd_opt(2026,6,10).unwrap());
     assert_eq!(*ripple.get(&wiring.id).unwrap(), NaiveDate::from_ymd_opt(2026,6,10).unwrap());
 
     // 6. Sanity.
-    assert_eq!(count_workdays(NaiveDate::from_ymd_opt(2026,6,8).unwrap(), NaiveDate::from_ymd_opt(2026,6,12).unwrap()), 5);
+    assert_eq!(count_workdays(NaiveDate::from_ymd_opt(2026,6,8).unwrap(), NaiveDate::from_ymd_opt(2026,6,12).unwrap(), false), 5);
 }

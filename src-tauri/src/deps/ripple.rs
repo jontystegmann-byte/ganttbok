@@ -5,13 +5,15 @@ use crate::calendar::workday::add_workdays_excluding;
 use super::graph::{build_adjacency, downstream};
 
 /// New start_dates for every downstream task after `dragged` shifts by `shift_workdays`.
-/// Excludes weekends + provided no-work-day set.
+/// Excludes provided no-work-day set. When `include_weekends` is true, Sat/Sun are treated
+/// as workdays (only explicit no-work-day entries cause skips).
 pub fn compute_ripple(
     tasks: &[Task],
     deps:  &[Dependency],
     dragged_id: i64,
     shift_workdays: i64,
     no_work_days: &HashSet<NaiveDate>,
+    include_weekends: bool,
 ) -> HashMap<i64, NaiveDate> {
     let mut out = HashMap::new();
     if shift_workdays == 0 { return out; }
@@ -22,7 +24,7 @@ pub fn compute_ripple(
 
     for id in downstream_ids {
         if let Some(t) = by_id.get(&id) {
-            let new_start = add_workdays_excluding(t.start_date, shift_workdays, no_work_days);
+            let new_start = add_workdays_excluding(t.start_date, shift_workdays, no_work_days, include_weekends);
             out.insert(id, new_start);
         }
     }
@@ -61,7 +63,7 @@ mod tests {
                           task(2, d(2026,6,11), 2),
                           task(3, d(2026,6,15), 1) ];
         let deps  = vec![ dep(1, 1, 2, 0), dep(2, 2, 3, 0) ];
-        let r = compute_ripple(&tasks, &deps, 1, 2, &HashSet::new());
+        let r = compute_ripple(&tasks, &deps, 1, 2, &HashSet::new(), false);
         assert_eq!(r.get(&2).copied(), Some(d(2026,6,15)));
         assert_eq!(r.get(&3).copied(), Some(d(2026,6,17)));
         assert!(!r.contains_key(&1), "dragged task itself not included");
@@ -72,7 +74,7 @@ mod tests {
         // T1: Mon, 2 days; T2 depends on T1 with lag 2; drag T1 +1
         let tasks = vec![ task(1, d(2026,6,8), 2), task(2, d(2026,6,12), 1) ];
         let deps  = vec![ dep(1, 1, 2, 2) ];
-        let r = compute_ripple(&tasks, &deps, 1, 1, &HashSet::new());
+        let r = compute_ripple(&tasks, &deps, 1, 1, &HashSet::new(), false);
         // T2 original start = T1_end + 2 wd; T1 shifted +1 -> T2 +1.
         assert_eq!(r.get(&2).copied(), Some(d(2026,6,15)));
     }
@@ -87,7 +89,7 @@ mod tests {
         hol.insert(d(2026,6,16));
         let tasks = vec![ task(1, d(2026,6,15), 1), task(2, d(2026,6,17), 1) ];
         let deps  = vec![ dep(1, 1, 2, 0) ];
-        let r = compute_ripple(&tasks, &deps, 1, 0, &hol);
+        let r = compute_ripple(&tasks, &deps, 1, 0, &hol, false);
         assert!(r.is_empty(), "shift of 0 should yield no ripple");
     }
 }
