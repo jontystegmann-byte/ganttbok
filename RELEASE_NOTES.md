@@ -3,6 +3,7 @@ Blik Plan v1.8.0 — Drag physics rewrite
 FIX
 - Dragging a long bar no longer "snaps further than where you released." The bar now follows the pointer 1:1 in raw pixels, and a 1px red ghost marker shows the workday it will commit to. Release lands on the ghost — no end-of-drag jump.
 - Dragging across a visible weekend no longer silently costs an extra workday or two. Pixel-to-workday now respects which calendar dates actually have columns in the timeline.
+- Tasks can now be dropped on Saturday or Sunday when the "Show weekends" toggle is on — useful for genuinely weekend-only work (site meetings, weekend shoots). Previously the backend always collapsed weekend drops to the nearest weekday; now the workday arithmetic honours the global include-weekends setting end-to-end.
 - Dragging onto a public holiday now snaps to the nearest workable day (forward in ties), respecting the per-job "Holidays block work" flag and the active region.
 - Cell width is now read from the canvas instead of a hard-coded 24px constant, so any future zoom won't desynchronise drag from rendering.
 
@@ -11,7 +12,8 @@ UNDER THE HOOD
 - New `src/lib/canvas/drag-physics.ts` module owns the ghost-date computation (`computeGhostDate`).
 - New `calendar.snapToNearestWorkable(iso, noWorkSet, includeWeekends)` helper. Symmetric ±90-day search; ties go forward.
 - Removed `src/lib/snap.ts` (magneticSnap) and its dead `absFrac > 0.5` branch.
-- 25 new unit tests across calendar, timeline, and drag-physics.
+- Rust workday arithmetic (`is_workday` / `add_workdays` / `count_workdays` / `add_workdays_excluding`) now takes an `include_weekends` flag read from the meta KV. Threaded through `apply_ripple`, `compute_ripple`, `drag_task`, `patches::apply`, `chaser::nudge`, and the inbox-review commands.
+- 29 new unit tests across calendar, timeline, drag-physics, and the Rust workday module.
 
 —
 
