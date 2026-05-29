@@ -47,16 +47,41 @@
   const isLit = $derived(
     store.hoveredTaskId === dep.predecessor_id || store.hoveredTaskId === dep.successor_id
   );
+
+  const isSelected = $derived(
+    store.selection?.kind === 'dependency' && store.selection.id === dep.id
+  );
+
+  function onClick(e: MouseEvent) {
+    e.stopPropagation();
+    store.select({ kind: 'dependency', id: dep.id });
+  }
+
+  const visibleStroke = $derived(
+    isSelected ? '#E11D2A' : isLit ? 'var(--c-accent)' : 'var(--c-border-bold)'
+  );
+  const visibleWidth = $derived(isSelected || isLit ? 2 : 1);
 </script>
 
 {#if path}
+  <!-- Wide invisible hit path so a 1px arrow is still clickable. -->
+  <path
+    d={path}
+    stroke="transparent"
+    stroke-width="10"
+    fill="none"
+    style="cursor: pointer;"
+    onclick={onClick}
+  />
   <path
     d={path}
     class="dep-line"
     class:lit={isLit}
-    stroke={isLit ? 'var(--c-accent)' : 'var(--c-border-bold)'}
-    stroke-width={isLit ? 2 : 1}
+    class:selected={isSelected}
+    stroke={visibleStroke}
+    stroke-width={visibleWidth}
     fill="none"
     marker-end="url(#arrowhead)"
+    pointer-events="none"
   />
 {/if}

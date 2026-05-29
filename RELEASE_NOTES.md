@@ -1,3 +1,10 @@
+Blik Plan v1.9.0 — Delete a dependency
+
+NEW
+- Click a dependency arrow to select it (turns BP red, thickens to 2px). Press Delete or Backspace to remove it. Undo (Cmd+Z) brings it back. A wide invisible hit-path sits along the visible arrow so the 1px line is comfortable to click without precision aim.
+
+—
+
 Blik Plan v1.8.2 — Fix dependency arrow on zero-gap predecessors
 
 FIX

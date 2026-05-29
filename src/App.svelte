@@ -15,6 +15,16 @@
     await store.bootstrap();
 
     function onKey(e: KeyboardEvent) {
+      // Delete / Backspace removes the selected dependency (when not typing in a field).
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const ae = document.activeElement as HTMLElement | null;
+        const inField = ae instanceof HTMLInputElement || ae instanceof HTMLTextAreaElement || ae?.isContentEditable;
+        if (!inField && store.selection?.kind === 'dependency') {
+          e.preventDefault();
+          void store.deleteDependency(store.selection.id);
+          return;
+        }
+      }
       const meta = e.metaKey || e.ctrlKey;
       if (!meta) return;
       if (e.key === 'z' && !e.shiftKey) {

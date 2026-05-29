@@ -494,6 +494,16 @@ class Store {
     this.selection = s;
   }
 
+  async deleteDependency(id: number): Promise<void> {
+    await ipc.deleteDependency(id);
+    this.dependencies = this.dependencies.filter(d => d.id !== id);
+    if (this.selection?.kind === 'dependency' && this.selection.id === id) {
+      this.selection = null;
+    }
+    await ipc.touchLastSave();
+    this.recordHistory();
+  }
+
   async reorderTasksInPhase(phaseId: number, orderedIds: number[]): Promise<void> {
     await ipc.reorderTasks(phaseId, orderedIds);
     const idx = new Map(orderedIds.map((id, i) => [id, i]));
