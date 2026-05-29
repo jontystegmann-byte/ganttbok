@@ -1,3 +1,10 @@
+Blik Plan v1.8.2 — Fix dependency arrow on zero-gap predecessors
+
+FIX
+- When a successor task started in the same column its predecessor ended in (no calendar gap), the dependency arrow's elbow couldn't fit between the bars and wrapped back into the successor — so the arrowhead appeared to come from inside the bar pointing left. The path now detours via a lane just outside the predecessor's row when the gap is tight, so the arrowhead always enters from outside the successor's left edge.
+
+—
+
 Blik Plan v1.8.1 — Fix new-job modal not appearing
 
 FIX

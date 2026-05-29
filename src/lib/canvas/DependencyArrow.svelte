@@ -27,8 +27,21 @@
     const y1 = preRow * 32 + 16;             // vertical centre
     const x2 = sucStartIdx * 24;             // left edge of successor
     const y2 = sucRow * 32 + 16;
-    // Right-angle elbow path
-    return `M ${x1} ${y1} L ${x1 + 6} ${y1} L ${x1 + 6} ${y2} L ${x2} ${y2}`;
+
+    const STUB = 6;
+    const gap = x2 - x1;
+
+    if (gap >= STUB * 2) {
+      // Normal elbow — enough room between predecessor end and successor start.
+      return `M ${x1} ${y1} L ${x1 + STUB} ${y1} L ${x1 + STUB} ${y2} L ${x2} ${y2}`;
+    }
+
+    // Tight or no gap: the elbow can't fit between the bars without wrapping back
+    // and entering the successor from the inside. Detour via a lane just outside
+    // the predecessor's row so the arrowhead still enters x2 from the left.
+    const sameRow = y1 === y2;
+    const lane = sameRow || y2 > y1 ? y1 + 16 : y1 - 16;
+    return `M ${x1} ${y1} L ${x1 + STUB} ${y1} L ${x1 + STUB} ${lane} L ${x2 - STUB} ${lane} L ${x2 - STUB} ${y2} L ${x2} ${y2}`;
   });
 
   const isLit = $derived(
