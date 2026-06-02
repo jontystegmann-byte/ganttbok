@@ -49,9 +49,21 @@ pub fn create_task(db: State<Db>, args: CreateTaskArgs) -> GbResult<Task> {
 #[tauri::command]
 pub fn update_task(db: State<Db>, task: Task) -> GbResult<()> {
     let conn = db.0.lock().unwrap();
+    update_task_inner(&conn, task)
+}
+
+pub(crate) fn update_task_inner(conn: &rusqlite::Connection, task: Task) -> GbResult<()> {
     let mut t = task;
     t.duration_workdays = t.duration_workdays.max(1);
-    task_repo::update(&conn, &t)
+    // Status & completion_date are owned exclusively by the dedicated status
+    // commands (set_task_status / mark_task_done_on_date / mark_task_running_late).
+    // A generic content edit (rename / resize / drag) must never change them, even
+    // if the frontend payload carries a stale value — otherwise a Late or Done task
+    // silently reverts to on_track. Preserve whatever is currently persisted.
+    let existing = task_repo::get(conn, t.id)?;
+    t.status = existing.status;
+    t.completion_date = existing.completion_date;
+    task_repo::update(conn, &t)
 }
 
 #[tauri::command]
@@ -590,6 +602,34 @@ mod tests {
         assert_eq!(overdue.len(), 1, "only Task A should be overdue");
         assert_eq!(overdue[0].task_id, a.id);
         assert_eq!(overdue[0].planned_end_date, NaiveDate::from_ymd_opt(2026, 6, 5).unwrap());
+    }
+
+    #[test]
+    fn update_task_never_changes_status_or_completion_date() {
+        // A content edit (rename / resize / drag) must NOT touch status. The
+        // frontend payload may carry a stale status (e.g. on_track) — update_task
+        // must preserve whatever the dedicated status commands persisted. Hard
+        // invariant: a Late task NEVER reverts to on_track except by an explicit
+        // status command.
+        let (conn, phase_id) = setup();
+        let a = task_repo::create(&conn, &NewTask {
+            phase_id, name: "A".into(),
+            start_date: NaiveDate::from_ymd_opt(2026, 6, 8).unwrap(),
+            duration_workdays: 2, order_index: 0, notes: None,
+        }).unwrap();
+        // Mark it Late through the dedicated path.
+        set_task_status_inner(&conn, a.id, "late", None).unwrap();
+
+        // Frontend edits the name with a STALE on_track status in the payload.
+        let mut stale = task_repo::get(&conn, a.id).unwrap();
+        stale.status = TaskStatus::OnTrack;
+        stale.completion_date = None;
+        stale.name = "A-renamed".into();
+        update_task_inner(&conn, stale).unwrap();
+
+        let after = task_repo::get(&conn, a.id).unwrap();
+        assert_eq!(after.name, "A-renamed", "content edit should apply");
+        assert_eq!(after.status, TaskStatus::Late, "status must NOT revert to on_track");
     }
 
     #[test]
