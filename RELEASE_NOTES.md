@@ -1,3 +1,10 @@
+Blik Plan v1.9.1 — Morning inbox no longer nags about done tasks
+
+FIX
+- The daily "today" view (and the Claude integration's `today` tool) was listing completed tasks as "overdue" — it filtered only on date and ignored the task's status. Done tasks are now excluded, so the morning inbox matches what you see in the app. Added a regression test so it can't creep back in.
+
+—
+
 Blik Plan v1.9.0 — Delete a dependency
 
 NEW
