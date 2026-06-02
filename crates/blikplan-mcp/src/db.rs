@@ -91,7 +91,10 @@ CREATE TABLE task (
     order_index       INTEGER NOT NULL,
     notes             TEXT,
     contact_id        INTEGER REFERENCES contact(id) ON DELETE SET NULL,
-    last_chaser_sent_at TEXT
+    last_chaser_sent_at TEXT,
+    status            TEXT    NOT NULL DEFAULT 'on_track'
+                      CHECK (status IN ('not_started','on_track','done','late')),
+    completion_date   TEXT
 );
 
 CREATE TABLE dependency (

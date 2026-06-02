@@ -446,3 +446,34 @@ async fn today_with_overdue_task_is_returned() {
     assert!(text.contains("overdue"), "expected overdue: {text}");
     client.cancel().await.unwrap();
 }
+
+#[tokio::test]
+async fn today_excludes_done_past_task() {
+    // Two past-end-date tasks under the same job: one still on_track (must be
+    // surfaced as overdue) and one already marked done (must NOT appear — a Done
+    // task is not overdue). Mirrors the in-app list_overdue_reviews behaviour.
+    let db = {
+        let conn = fixture_db();
+        conn.execute_batch(
+            "INSERT INTO job (name, project_start_date, region) VALUES ('TestJob', '2020-01-01', 'ZA');
+             INSERT INTO phase (job_id, name, colour, order_index) VALUES (1, 'P', '#fff', 0);
+             INSERT INTO task (phase_id, name, start_date, duration_workdays, order_index, status)
+             VALUES (1, 'StillOpen', '2020-01-05', 1, 0, 'on_track');
+             INSERT INTO task (phase_id, name, start_date, duration_workdays, order_index, status, completion_date)
+             VALUES (1, 'AlreadyDone', '2020-01-05', 1, 1, 'done', '2020-01-05');"
+        ).unwrap();
+        conn
+    };
+    let client = make_client(db).await;
+    let result = client.call_tool(rmcp::model::CallToolRequestParam {
+        name: "today".into(),
+        arguments: None,
+    }).await.unwrap();
+    let text = result.content.first()
+        .and_then(|c| c.raw.as_text())
+        .map(|t| t.text.as_str())
+        .unwrap_or("");
+    assert!(text.contains("StillOpen"), "on_track past task should be overdue: {text}");
+    assert!(!text.contains("AlreadyDone"), "done task must not appear as overdue: {text}");
+    client.cancel().await.unwrap();
+}

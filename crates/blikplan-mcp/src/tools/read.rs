@@ -326,12 +326,15 @@ pub fn query_today(conn: &Connection, job_id: Option<i64>) -> Result<Vec<TodayIt
     // Filtering is done in Rust; SQL just fetches candidates from non-archived jobs.
     let today = chrono::Local::now().date_naive().to_string();
 
+    // Done tasks are never "overdue" — exclude them at the SQL layer so the
+    // today/overdue view matches the in-app inbox (list_overdue_reviews_inner).
     let base_sql = "SELECT t.id, t.name, t.start_date, t.duration_workdays,
                            j.id AS job_id, j.name AS job_name
                     FROM task t
                     JOIN phase p ON p.id = t.phase_id
                     JOIN job j ON j.id = p.job_id
-                    WHERE j.archived = 0 AND j.is_template = 0";
+                    WHERE j.archived = 0 AND j.is_template = 0
+                      AND t.status != 'done'";
 
     let filter = if job_id.is_some() { " AND j.id = ?1" } else { "" };
     let sql = format!("{base_sql}{filter} ORDER BY t.start_date");
