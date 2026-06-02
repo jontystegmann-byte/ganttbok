@@ -1,3 +1,10 @@
+Blik Plan v1.9.2 — Task status no longer reverts on save or job-switch
+
+FIX
+- Tasks marked Done or Running Late could silently revert to On Track — so completed tasks kept reappearing in the morning inbox and "running late" flags reset themselves. The cause: saving (⌘S / the Saved button / undo) and editing or dragging a task re-wrote the task without its status, defaulting it back to On Track. Status is now preserved across every save, edit, drag, undo and job-switch. A Late or Done task only ever changes status when you explicitly change it.
+
+—
+
 Blik Plan v1.9.1 — Morning inbox no longer nags about done tasks
 
 FIX
