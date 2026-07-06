@@ -29,6 +29,7 @@ dirs = "5.0"
 tauri-plugin-updater = "2.10.1"
 tauri-plugin-process = "2.3.1"
 reqwest = { version = "0.13", default-features = false, features = ["rustls", "blocking", "json"] }
+rust_xlsxwriter = "0.79"
 
 [dev-dependencies]
 tempfile = "3.10"

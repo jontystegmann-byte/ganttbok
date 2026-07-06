@@ -248,3 +248,36 @@ export interface ClaudeDetection {
 export interface ClaudeDetectionResult {
   surfaces: ClaudeDetection[];
 }
+
+export type Procurement = 'not_ordered' | 'quoted' | 'ordered' | 'delivered';
+
+export interface BoqItem {
+  id: number;
+  job_id: number;
+  order_index: number;
+  item: string;
+  qty: number | null;
+  unit: string | null;
+  rate: number | null;
+  trade: string | null;
+  full_spec: string | null;
+  w_mm: number | null;
+  d_mm: number | null;
+  h_mm: number | null;
+  dia_mm: number | null;
+  supplier: string | null;
+  location: string | null;
+  procurement: Procurement;
+  delivered_date: string | null;
+  lead_weeks: number | null;
+  invoice_no: string | null;
+  tut_ref_no: string | null;
+  organisation: string | null;
+  created_at: string;
+}
+
+export interface SetProcurementArgs {
+  id: number;
+  procurement: Procurement;
+  delivered_date: string | null;
+}

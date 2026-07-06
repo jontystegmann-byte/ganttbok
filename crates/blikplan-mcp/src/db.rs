@@ -69,7 +69,8 @@ CREATE TABLE job (
     archived           INTEGER NOT NULL DEFAULT 0,
     created_at         TEXT    NOT NULL DEFAULT (datetime('now')),
     holidays_block_work INTEGER NOT NULL DEFAULT 1,
-    region             TEXT    NOT NULL DEFAULT 'ZA'
+    region             TEXT    NOT NULL DEFAULT 'ZA',
+    budget             REAL
 );
 
 CREATE TABLE phase (
@@ -126,6 +127,32 @@ CREATE TABLE pending_patches (
     created_at  INTEGER NOT NULL,
     resolved_at INTEGER,
     error       TEXT
+);
+
+CREATE TABLE boq_item (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id         INTEGER NOT NULL REFERENCES job(id) ON DELETE CASCADE,
+    order_index    INTEGER NOT NULL,
+    item           TEXT    NOT NULL DEFAULT '',
+    qty            REAL,
+    unit           TEXT,
+    rate           REAL,
+    trade          TEXT,
+    full_spec      TEXT,
+    w_mm           REAL,
+    d_mm           REAL,
+    h_mm           REAL,
+    dia_mm         REAL,
+    supplier       TEXT,
+    location       TEXT,
+    procurement    TEXT    NOT NULL DEFAULT 'not_ordered'
+                           CHECK (procurement IN ('not_ordered','quoted','ordered','delivered')),
+    delivered_date TEXT,
+    lead_weeks     REAL,
+    invoice_no     TEXT,
+    tut_ref_no     TEXT,
+    organisation   TEXT,
+    created_at     TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 "#;
 

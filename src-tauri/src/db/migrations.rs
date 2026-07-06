@@ -145,6 +145,40 @@ const MIGRATIONS: &[&str] = &[
     r#"
     UPDATE task SET status = 'on_track' WHERE status = 'not_started';
     "#,
+    // v10 — Bill of Quantities: per-job line items + per-job budget.
+    // boq_item is job-scoped like phase/no_work_day (cascade on job delete).
+    // Money columns are REAL rand; `cost` is NOT stored (computed qty*rate).
+    // `procurement` is the single status lifecycle; `update` must never touch it.
+    r#"
+    ALTER TABLE job ADD COLUMN budget REAL;
+
+    CREATE TABLE boq_item (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        job_id         INTEGER NOT NULL REFERENCES job(id) ON DELETE CASCADE,
+        order_index    INTEGER NOT NULL,
+        item           TEXT    NOT NULL DEFAULT '',
+        qty            REAL,
+        unit           TEXT,
+        rate           REAL,
+        trade          TEXT,
+        full_spec      TEXT,
+        w_mm           REAL,
+        d_mm           REAL,
+        h_mm           REAL,
+        dia_mm         REAL,
+        supplier       TEXT,
+        location       TEXT,
+        procurement    TEXT    NOT NULL DEFAULT 'not_ordered'
+                               CHECK (procurement IN ('not_ordered','quoted','ordered','delivered')),
+        delivered_date TEXT,
+        lead_weeks     REAL,
+        invoice_no     TEXT,
+        tut_ref_no     TEXT,
+        organisation   TEXT,
+        created_at     TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX idx_boq_item_job ON boq_item(job_id, order_index);
+    "#,
 ];
 
 pub fn apply_migrations(conn: &Connection) -> GbResult<()> {
@@ -359,5 +393,67 @@ mod tests {
             |r| r.get(0),
         ).unwrap();
         assert_eq!(auto, 1);
+    }
+
+    #[test]
+    fn boq_item_table_has_expected_columns() {
+        let conn = Connection::open_in_memory().unwrap();
+        apply_migrations(&conn).unwrap();
+
+        let cols: Vec<String> = conn
+            .prepare("PRAGMA table_info(boq_item)")
+            .unwrap()
+            .query_map([], |r| r.get::<_, String>(1))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+
+        for expected in &[
+            "id", "job_id", "order_index", "item", "qty", "unit", "rate", "trade",
+            "full_spec", "w_mm", "d_mm", "h_mm", "dia_mm", "supplier", "location",
+            "procurement", "delivered_date", "lead_weeks", "invoice_no",
+            "tut_ref_no", "organisation", "created_at",
+        ] {
+            assert!(
+                cols.iter().any(|c| c == expected),
+                "missing column {expected}; got {cols:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn boq_item_defaults_to_not_ordered_and_cascades() {
+        let conn = Connection::open_in_memory().unwrap();
+        apply_migrations(&conn).unwrap();
+
+        conn.execute(
+            "INSERT INTO job (name, project_start_date) VALUES ('t', '2026-01-01')",
+            [],
+        ).unwrap();
+        let job_id: i64 = conn.last_insert_rowid();
+
+        conn.execute(
+            "INSERT INTO boq_item (job_id, order_index, item) VALUES (?1, 0, 'Heat pump')",
+            params![job_id],
+        ).unwrap();
+
+        let proc: String = conn.query_row(
+            "SELECT procurement FROM boq_item WHERE job_id = ?1",
+            params![job_id], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(proc, "not_ordered");
+
+        // job.budget column exists and defaults to NULL
+        let budget: Option<f64> = conn.query_row(
+            "SELECT budget FROM job WHERE id = ?1", params![job_id], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(budget, None);
+
+        // deleting the job cascades to its boq_items
+        conn.execute("DELETE FROM job WHERE id = ?1", params![job_id]).unwrap();
+        let remaining: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM boq_item", [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(remaining, 0);
     }
 }

@@ -3,6 +3,7 @@
   import { store } from './lib/store.svelte';
   import AppHeader from './lib/components/AppHeader.svelte';
   import GanttCanvas from './lib/canvas/GanttCanvas.svelte';
+  import BoqPage from './lib/boq/BoqPage.svelte';
   import JobSwitcher from './lib/sidebar/JobSwitcher.svelte';
   import DetailsPanel from './lib/details/DetailsPanel.svelte';
   import PrintOptions from './lib/print/PrintOptions.svelte';
@@ -50,7 +51,9 @@
   <AppHeader />
   <div class="app-body">
     <main class="canvas-pane">
-      {#if store.currentJob}
+      {#if store.activeView === 'boq'}
+        <BoqPage />
+      {:else if store.currentJob}
         <GanttCanvas />
       {:else}
         <div class="empty-state">

@@ -28,3 +28,4 @@ src-tauri/.cargo/
 
 # Env
 .env*
+.superpowers/

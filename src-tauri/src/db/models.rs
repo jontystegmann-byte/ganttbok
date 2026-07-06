@@ -34,6 +34,40 @@ impl Default for TaskStatus {
     fn default() -> Self { TaskStatus::OnTrack }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Procurement {
+    NotOrdered,
+    Quoted,
+    Ordered,
+    Delivered,
+}
+
+impl Procurement {
+    pub fn as_db_str(&self) -> &'static str {
+        match self {
+            Procurement::NotOrdered => "not_ordered",
+            Procurement::Quoted     => "quoted",
+            Procurement::Ordered    => "ordered",
+            Procurement::Delivered  => "delivered",
+        }
+    }
+
+    pub fn from_db_str(s: &str) -> Result<Self, String> {
+        match s {
+            "not_ordered" => Ok(Procurement::NotOrdered),
+            "quoted"      => Ok(Procurement::Quoted),
+            "ordered"     => Ok(Procurement::Ordered),
+            "delivered"   => Ok(Procurement::Delivered),
+            other         => Err(format!("unknown procurement status: {other}")),
+        }
+    }
+}
+
+impl Default for Procurement {
+    fn default() -> Self { Procurement::NotOrdered }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Job {
     pub id: i64,
@@ -124,6 +158,33 @@ pub struct NewContact {
     pub telegram_chat_id: Option<String>,
     pub telegram_handle: Option<String>,
     pub notes: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct BoqItem {
+    pub id: i64,
+    pub job_id: i64,
+    pub order_index: i64,
+    pub item: String,
+    pub qty: Option<f64>,
+    pub unit: Option<String>,
+    pub rate: Option<f64>,
+    pub trade: Option<String>,
+    pub full_spec: Option<String>,
+    pub w_mm: Option<f64>,
+    pub d_mm: Option<f64>,
+    pub h_mm: Option<f64>,
+    pub dia_mm: Option<f64>,
+    pub supplier: Option<String>,
+    pub location: Option<String>,
+    #[serde(default)]
+    pub procurement: Procurement,
+    pub delivered_date: Option<String>,
+    pub lead_weeks: Option<f64>,
+    pub invoice_no: Option<String>,
+    pub tut_ref_no: Option<String>,
+    pub organisation: Option<String>,
+    pub created_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -267,5 +328,35 @@ mod tests {
         assert_eq!(meta_get(&conn, "last_open_job_id").unwrap(), Some("42".into()));
         meta_set(&conn, "last_open_job_id", "43").unwrap();
         assert_eq!(meta_get(&conn, "last_open_job_id").unwrap(), Some("43".into()));
+    }
+
+    #[test]
+    fn procurement_db_str_roundtrip() {
+        for p in [
+            Procurement::NotOrdered, Procurement::Quoted,
+            Procurement::Ordered, Procurement::Delivered,
+        ] {
+            assert_eq!(Procurement::from_db_str(p.as_db_str()).unwrap(), p);
+        }
+        assert!(Procurement::from_db_str("bogus").is_err());
+        assert_eq!(Procurement::default(), Procurement::NotOrdered);
+    }
+
+    #[test]
+    fn boq_item_serializes_to_json() {
+        let b = BoqItem {
+            id: 1, job_id: 1, order_index: 0, item: "Heat pump".into(),
+            qty: Some(1.0), unit: Some("item".into()), rate: Some(49444.25),
+            trade: Some("HVAC".into()), full_spec: None,
+            w_mm: None, d_mm: None, h_mm: None, dia_mm: None,
+            supplier: Some("Hydrofire".into()), location: Some("Whole house".into()),
+            procurement: Procurement::Ordered, delivered_date: None,
+            lead_weeks: Some(4.0), invoice_no: None, tut_ref_no: None,
+            organisation: Some("HydroFire".into()),
+            created_at: "2026-07-06T10:00:00".into(),
+        };
+        let s = serde_json::to_string(&b).unwrap();
+        let back: BoqItem = serde_json::from_str(&s).unwrap();
+        assert_eq!(b, back);
     }
 }

@@ -11,10 +11,10 @@ use rmcp::{
 };
 
 use crate::tools::read::{
-    GetJobParams, ListTasksParams, GetTaskParams, SearchParams, TodayParams,
+    GetJobParams, ListTasksParams, GetTaskParams, SearchParams, TodayParams, ListBoqParams,
     query_list_jobs, query_get_job,
     query_list_tasks, query_get_task, query_list_contacts,
-    query_search, query_today,
+    query_search, query_today, query_list_boq,
 };
 use crate::tools::write::{ProposePatchParams, handle_propose_patch};
 
@@ -109,6 +109,15 @@ impl BlikPlanServer {
     async fn today(&self, Parameters(p): Parameters<TodayParams>) -> String {
         let conn = self.db.lock().unwrap();
         match query_today(&conn, p.job_id) {
+            Ok(items) => serde_json::to_string_pretty(&items).unwrap_or_else(|e| e.to_string()),
+            Err(e) => format!("{{\"error\":\"{e}\"}}"),
+        }
+    }
+
+    #[tool(description = "List Bill of Quantities line items for a job. Returns id, item, qty, rate, cost, trade, supplier, location, procurement (not_ordered|quoted|ordered|delivered).")]
+    async fn list_boq(&self, Parameters(p): Parameters<ListBoqParams>) -> String {
+        let conn = self.db.lock().unwrap();
+        match query_list_boq(&conn, p.job_id) {
             Ok(items) => serde_json::to_string_pretty(&items).unwrap_or_else(|e| e.to_string()),
             Err(e) => format!("{{\"error\":\"{e}\"}}"),
         }

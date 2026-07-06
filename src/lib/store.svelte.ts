@@ -1,5 +1,5 @@
 import * as ipc from './ipc';
-import type { Job, Phase, Task, Dependency, NoWorkDay, Contact, PendingPatch, TaskStatus, OverdueReview } from './types';
+import type { Job, Phase, Task, Dependency, NoWorkDay, Contact, PendingPatch, TaskStatus, OverdueReview, BoqItem, Procurement } from './types';
 import type { Zone } from './hit-test';
 import { UndoStack, type Snapshot as UndoSnapshot } from './undo';
 
@@ -68,6 +68,15 @@ class Store {
     this.activeTool = this.activeTool === tool ? null : tool;
   }
 
+  // Top-level view: the schedule (Gantt) or the Bill of Quantities. Co-equal pages.
+  activeView = $state<'schedule' | 'boq'>('schedule');
+  setView(view: 'schedule' | 'boq'): void { this.activeView = view; }
+
+  // Bill of Quantities line items for the open job.
+  boqItems = $state<BoqItem[]>([]);
+  boqBudget = $state<number | null>(null);
+  showBoqFinancials = $state<boolean>(false);
+
   async toggleDurationUnit(): Promise<void> {
     this.durationUnit = this.durationUnit === 'weeks' ? 'days' : 'weeks';
     await ipc.setDurationUnit(this.durationUnit);
@@ -86,6 +95,53 @@ class Store {
 
   async refreshContacts(): Promise<void> {
     this.contacts = await ipc.listContacts();
+  }
+
+  async refreshBoqItems(): Promise<void> {
+    if (!this.currentJob) { this.boqItems = []; return; }
+    this.boqItems = await ipc.listBoqItems(this.currentJob.id);
+  }
+
+  async refreshBoqBudget(): Promise<void> {
+    if (!this.currentJob) { this.boqBudget = null; return; }
+    this.boqBudget = await ipc.getJobBudget(this.currentJob.id);
+  }
+
+  async setBoqBudget(budget: number | null): Promise<void> {
+    if (!this.currentJob) return;
+    await ipc.setJobBudget(this.currentJob.id, budget);
+    this.boqBudget = budget;
+    await ipc.touchLastSave();
+  }
+
+  async createBoqItem(): Promise<void> {
+    if (!this.currentJob) return;
+    const created = await ipc.createBoqItem(this.currentJob.id);
+    this.boqItems = [...this.boqItems, created];
+    await ipc.touchLastSave();
+  }
+
+  async updateBoqItem(item: BoqItem): Promise<void> {
+    await ipc.updateBoqItem($state.snapshot(item));
+    this.boqItems = this.boqItems.map(b => b.id === item.id ? { ...item } : b);
+    await ipc.touchLastSave();
+  }
+
+  async setBoqProcurement(id: number, procurement: Procurement, deliveredDate: string | null): Promise<void> {
+    await ipc.setBoqProcurement({ id, procurement, delivered_date: deliveredDate });
+    // Backend owns delivered_date: it stores it only when procurement === 'delivered'.
+    const resolved = procurement === 'delivered'
+      ? (deliveredDate ?? this.todayIso)
+      : null;
+    this.boqItems = this.boqItems.map(b =>
+      b.id === id ? { ...b, procurement, delivered_date: resolved } : b);
+    await ipc.touchLastSave();
+  }
+
+  async deleteBoqItem(id: number): Promise<void> {
+    await ipc.deleteBoqItem(id);
+    this.boqItems = this.boqItems.filter(b => b.id !== id);
+    await ipc.touchLastSave();
   }
 
   async createContact(args: { name: string; telegram_chat_id: string | null; telegram_handle: string | null; notes: string }): Promise<Contact> {
@@ -480,7 +536,10 @@ class Store {
     this.tasks        = await ipc.listTasks(jobId);
     this.dependencies = await ipc.listDependencies(jobId);
     this.noWorkDays   = await ipc.listNoWorkDays(jobId);
+    this.boqItems = await ipc.listBoqItems(jobId);
+    this.boqBudget = await ipc.getJobBudget(jobId);
     this.selection    = null;
+    this.activeView = 'schedule';
     await ipc.setLastOpenJob(jobId);
     this.undoStack.clear();
     this.recordHistory(); // seed
