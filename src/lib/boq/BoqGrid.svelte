@@ -63,8 +63,15 @@
     await store.setBoqProcurement(it.id, value, deliveredDate);
   }
 
-  async function remove(it: BoqItem): Promise<void> {
-    if (confirm(`Delete "${it.item || 'this line'}"?`)) await store.deleteBoqItem(it.id);
+  // Inline two-click delete confirm (native confirm() is a no-op in the Tauri webview).
+  let confirmingDeleteId = $state<number | null>(null);
+  function requestDelete(it: BoqItem): void {
+    if (confirmingDeleteId === it.id) {
+      confirmingDeleteId = null;
+      void store.deleteBoqItem(it.id);
+    } else {
+      confirmingDeleteId = it.id;
+    }
   }
 </script>
 
@@ -117,7 +124,12 @@
               {/if}
             </td>
           {/each}
-          <td class="row-actions"><button class="del" title="Delete row" onclick={() => remove(it)}>×</button></td>
+          <td class="row-actions"><button
+            class="del"
+            class:confirming={confirmingDeleteId === it.id}
+            title={confirmingDeleteId === it.id ? 'Click again to confirm' : 'Delete row'}
+            onclick={() => requestDelete(it)}
+          >{confirmingDeleteId === it.id ? 'Delete?' : '×'}</button></td>
         </tr>
       {/each}
       {#if rows.length === 0}
@@ -151,5 +163,7 @@
   .del { border: 0; background: transparent; color: var(--c-text-muted); cursor: pointer; font-size: 15px; visibility: hidden; }
   tr:hover .del { visibility: visible; }
   .del:hover { color: var(--c-accent); }
+  .del.confirming { visibility: visible; background: #d64545; color: #fff; border-radius: 4px;
+    padding: 0 6px; font-size: var(--font-size-xs); }
   .empty { text-align: center; color: var(--c-text-muted); padding: var(--sp-4); }
 </style>

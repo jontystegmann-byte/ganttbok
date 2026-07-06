@@ -8,7 +8,7 @@
 
   let editingBudget = $state(false);
   let budgetDraft = $state('');
-  const expanded = $state<Set<string>>(new Set());
+  let expanded = $state<Set<string>>(new Set());
 
   function fmt(n: number): string { return 'R ' + Math.round(n).toLocaleString('en-ZA'); }
   function pct(n: number): number {
@@ -24,8 +24,7 @@
   function toggle(trade: string): void {
     const next = new Set(expanded);
     next.has(trade) ? next.delete(trade) : next.add(trade);
-    // reassign so Svelte tracks it
-    expanded.clear(); next.forEach(t => expanded.add(t));
+    expanded = next; // reassign a new Set → guaranteed reactive in Svelte 5
   }
   function itemsForTrade(trade: string) {
     return store.boqItems.filter(i => (i.trade ?? 'Untraded') === trade);
