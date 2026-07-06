@@ -75,6 +75,7 @@ class Store {
   // Bill of Quantities line items for the open job.
   boqItems = $state<BoqItem[]>([]);
   boqBudget = $state<number | null>(null);
+  showBoqFinancials = $state<boolean>(false);
 
   async toggleDurationUnit(): Promise<void> {
     this.durationUnit = this.durationUnit === 'weeks' ? 'days' : 'weeks';

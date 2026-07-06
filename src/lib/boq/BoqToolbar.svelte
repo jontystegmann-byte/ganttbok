@@ -2,6 +2,8 @@
   import { COLUMNS, PROCUREMENT_LABELS, type ColumnKey, type StatusFilter } from './boq-grid';
   import type { Procurement } from '../types';
   import { store } from '../store.svelte';
+  import * as ipc from '../ipc';
+  import { revealItemInDir } from '@tauri-apps/plugin-opener';
 
   let {
     status = $bindable(),
@@ -14,6 +16,18 @@
   } = $props();
 
   let showColumns = $state(false);
+  let showExport = $state(false);
+
+  async function doExport(format: 'xlsx' | 'ods'): Promise<void> {
+    showExport = false;
+    if (!store.currentJob) return;
+    try {
+      const path = await ipc.exportBoq(store.currentJob.id, format);
+      await revealItemInDir(path);
+    } catch (e) {
+      (window as unknown as { __toast?: (m: string) => void }).__toast?.(`Export failed: ${e}`);
+    }
+  }
 
   const STATUSES: StatusFilter[] = ['all', 'not_ordered', 'quoted', 'ordered', 'delivered'];
   function statusLabel(s: StatusFilter): string {
@@ -55,6 +69,17 @@
   </div>
 
   <button class="btn primary" onclick={() => store.createBoqItem()}>+ Add item</button>
+
+  <div class="export">
+    <button class="btn" onclick={() => (showExport = !showExport)}>⤓ Export ▾</button>
+    {#if showExport}
+      <div class="menu">
+        <button class="menu-btn" onclick={() => doExport('xlsx')}>Export .xlsx</button>
+        <button class="menu-btn" onclick={() => doExport('ods')}>Export .ods</button>
+      </div>
+    {/if}
+  </div>
+  <button class="btn" class:on={store.showBoqFinancials} onclick={() => (store.showBoqFinancials = !store.showBoqFinancials)}>◧ Financials</button>
 </div>
 
 <style>
@@ -75,4 +100,11 @@
     box-shadow: 0 6px 20px rgba(0,0,0,0.18); max-height: 320px; overflow: auto; }
   .menu-row { display: flex; align-items: center; gap: var(--sp-2); padding: 3px 2px;
     font-size: var(--font-size-sm); color: var(--c-text); white-space: nowrap; }
+  .export { position: relative; }
+  .menu { position: absolute; top: 110%; right: 0; z-index: 30; background: var(--c-panel);
+    border: 1px solid var(--c-border); border-radius: 6px; padding: var(--sp-1); box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
+  .menu-btn { display: block; width: 100%; text-align: left; border: 0; background: transparent; color: var(--c-text);
+    font: inherit; font-size: var(--font-size-sm); padding: var(--sp-1) var(--sp-2); cursor: pointer; white-space: nowrap; border-radius: 4px; }
+  .menu-btn:hover { background: var(--c-accent-fade); }
+  .btn.on { background: var(--c-accent); color: #fff; border-color: var(--c-accent); }
 </style>
