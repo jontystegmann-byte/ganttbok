@@ -123,6 +123,7 @@ pub fn run() {
             commands::boq::delete_boq_item,
             commands::boq::set_job_budget,
             commands::boq::get_job_budget,
+            commands::boq_export::export_boq,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {

@@ -14,6 +14,7 @@ pub mod chaser;
 pub mod patches;
 pub mod claude;
 pub mod boq;
+pub mod boq_export;
 
 /// Wraps the singleton SQLite connection in a Mutex so Tauri can pass it
 /// to command handlers as `tauri::State<Db>`.
