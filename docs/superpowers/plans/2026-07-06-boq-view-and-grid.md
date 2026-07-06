@@ -32,7 +32,7 @@
 | `src/lib/types.ts` | `Procurement`, `BoqItem`, `SetProcurementArgs` types | Modify |
 | `src/lib/ipc.ts` | BoQ invoke wrappers | Modify |
 | `src/lib/boq/boq-grid.ts` | column config + sort/filter pure logic | Create |
-| `src/lib/boq/boq-grid.test.ts` | vitest for the above | Create |
+| `src/lib/boq/__tests__/boq-grid.test.ts` | vitest for the above (repo convention: tests live under `__tests__/`) | Create |
 | `package.json` | add `"test": "vitest run"` script | Modify |
 | `src/lib/store.svelte.ts` | `activeView` + BoQ state/methods | Modify |
 | `src/lib/components/AppHeader.svelte` | view switcher control | Modify |
@@ -124,7 +124,7 @@ git commit -m "feat(boq): frontend types + IPC wrappers"
 
 **Files:**
 - Create: `src/lib/boq/boq-grid.ts`
-- Create: `src/lib/boq/boq-grid.test.ts`
+- Create: `src/lib/boq/__tests__/boq-grid.test.ts`  (repo's `vitest.config.ts` only discovers `src/**/__tests__/**/*.test.ts`)
 - Modify: `package.json` (add test script)
 
 - [ ] **Step 1: Add a test script**
@@ -137,14 +137,14 @@ In `package.json` `scripts`, add:
 
 - [ ] **Step 2: Write the failing tests**
 
-Create `src/lib/boq/boq-grid.test.ts`:
+Create `src/lib/boq/__tests__/boq-grid.test.ts`:
 
 ```ts
 import { describe, it, expect } from 'vitest';
 import {
   COLUMNS, DEFAULT_HIDDEN, cost, sortItems, filterItems, type ColumnKey,
-} from './boq-grid';
-import type { BoqItem } from '../types';
+} from '../boq-grid';
+import type { BoqItem } from '../../types';
 
 function mk(partial: Partial<BoqItem>): BoqItem {
   return {
@@ -223,8 +223,8 @@ describe('filterItems', () => {
 
 - [ ] **Step 3: Run tests to verify they fail**
 
-Run: `cd /Users/cncuser/Desktop/GanttBok && npx vitest run src/lib/boq/boq-grid.test.ts`
-Expected: FAIL — `Cannot find module './boq-grid'`.
+Run: `cd /Users/cncuser/Desktop/GanttBok && npx vitest run boq-grid`
+Expected: FAIL — `Cannot find module '../boq-grid'`.
 
 - [ ] **Step 4: Implement the module**
 
@@ -330,13 +330,13 @@ export function filterItems(items: BoqItem[], status: StatusFilter, search: stri
 
 - [ ] **Step 5: Run tests to verify they pass**
 
-Run: `cd /Users/cncuser/Desktop/GanttBok && npx vitest run src/lib/boq/boq-grid.test.ts`
+Run: `cd /Users/cncuser/Desktop/GanttBok && npx vitest run boq-grid`
 Expected: PASS — all cost/columns/sort/filter tests green.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/lib/boq/boq-grid.ts src/lib/boq/boq-grid.test.ts package.json
+git add src/lib/boq/boq-grid.ts src/lib/boq/__tests__/boq-grid.test.ts package.json
 git commit -m "feat(boq): grid logic (columns/sort/filter/cost) + vitest"
 ```
 
