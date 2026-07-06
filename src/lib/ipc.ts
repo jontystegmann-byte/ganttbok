@@ -7,6 +7,7 @@ import type {
   PendingPatch,
   ClaudeSurface, ClaudeDetectionResult,
   TaskStatus, OverdueReview,
+  BoqItem, SetProcurementArgs,
 } from './types';
 
 // Jobs
@@ -146,3 +147,15 @@ export async function connectToClaude(surfaces: ClaudeSurface[]): Promise<Claude
 export async function disconnectFromClaude(surfaces: ClaudeSurface[]): Promise<ClaudeDetectionResult> {
   return invoke('disconnect_from_claude', { surfaces });
 }
+
+// Bill of Quantities
+export const listBoqItems    = (jobId: number)              => invoke<BoqItem[]>('list_boq_items', { jobId });
+export const createBoqItem   = (jobId: number)              => invoke<BoqItem>('create_boq_item', { jobId });
+export const updateBoqItem   = (args: BoqItem)              => invoke<void>('update_boq_item', { args });
+export const setBoqProcurement = (args: SetProcurementArgs) => invoke<void>('set_boq_procurement', { args });
+export const reorderBoqItem  = (id: number, orderIndex: number) =>
+  invoke<void>('reorder_boq_item', { args: { id, order_index: orderIndex } });
+export const deleteBoqItem   = (id: number)                 => invoke<void>('delete_boq_item', { id });
+export const setJobBudget    = (jobId: number, budget: number | null) =>
+  invoke<void>('set_job_budget', { args: { job_id: jobId, budget } });
+export const getJobBudget    = (jobId: number)              => invoke<number | null>('get_job_budget', { jobId });
