@@ -45,6 +45,20 @@ pub struct DepSummary {
 }
 
 #[derive(Debug, Serialize)]
+pub struct BoqItemSummary {
+    pub id: i64,
+    pub item: String,
+    pub qty: Option<f64>,
+    pub rate: Option<f64>,
+    /// qty * rate when both present, else null. Convenience so callers don't recompute.
+    pub cost: Option<f64>,
+    pub trade: Option<String>,
+    pub supplier: Option<String>,
+    pub location: Option<String>,
+    pub procurement: String,
+}
+
+#[derive(Debug, Serialize)]
 pub struct FullJob {
     pub id: i64,
     pub name: String,
@@ -89,6 +103,12 @@ pub struct ListTasksParams {
 pub struct GetTaskParams {
     /// DB integer id of the task to fetch.
     pub task_id: i64,
+}
+
+#[derive(Debug, Deserialize, JsonSchema, Default)]
+pub struct ListBoqParams {
+    /// Job id whose BoQ line items to list.
+    pub job_id: i64,
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -229,6 +249,29 @@ pub fn query_list_contacts(conn: &Connection) -> Result<Vec<ContactSummary>, Str
         telegram_handle: r.get(2)?,
         notes: r.get(3)?,
     })).map_err(|e| e.to_string())?;
+    rows.map(|r| r.map_err(|e| e.to_string())).collect()
+}
+
+pub fn query_list_boq(conn: &Connection, job_id: i64) -> Result<Vec<BoqItemSummary>, String> {
+    let mut stmt = conn.prepare(
+        "SELECT id, item, qty, rate, trade, supplier, location, procurement
+         FROM boq_item WHERE job_id = ?1 ORDER BY order_index ASC"
+    ).map_err(|e| e.to_string())?;
+    let rows = stmt.query_map([job_id], |r| {
+        let qty: Option<f64> = r.get(2)?;
+        let rate: Option<f64> = r.get(3)?;
+        Ok(BoqItemSummary {
+            id: r.get(0)?,
+            item: r.get(1)?,
+            qty,
+            rate,
+            cost: match (qty, rate) { (Some(q), Some(rt)) => Some(q * rt), _ => None },
+            trade: r.get(4)?,
+            supplier: r.get(5)?,
+            location: r.get(6)?,
+            procurement: r.get(7)?,
+        })
+    }).map_err(|e| e.to_string())?;
     rows.map(|r| r.map_err(|e| e.to_string())).collect()
 }
 
@@ -385,4 +428,32 @@ pub fn query_today(conn: &Connection, job_id: Option<i64>) -> Result<Vec<TodayIt
         });
     }
     Ok(items)
+}
+
+#[cfg(test)]
+mod boq_tests {
+    use super::*;
+    use rusqlite::Connection;
+
+    #[test]
+    fn query_list_boq_returns_items_with_cost() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::db::apply_migrations_for_test(&conn);
+        conn.execute(
+            "INSERT INTO job (name, project_start_date) VALUES ('t', '2026-01-01')",
+            [],
+        ).unwrap();
+        let job_id = conn.last_insert_rowid();
+        conn.execute(
+            "INSERT INTO boq_item (job_id, order_index, item, qty, rate, trade, procurement)
+             VALUES (?1, 0, 'Heat pump', 1, 49444.25, 'HVAC', 'ordered')",
+            rusqlite::params![job_id],
+        ).unwrap();
+
+        let out = query_list_boq(&conn, job_id).unwrap();
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].item, "Heat pump");
+        assert_eq!(out[0].cost, Some(49444.25));
+        assert_eq!(out[0].procurement, "ordered");
+    }
 }
