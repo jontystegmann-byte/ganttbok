@@ -1,3 +1,20 @@
+Blik Plan v1.10.0 — Bill of Quantities
+
+NEW
+- **Bill of Quantities** — a whole new section for materials, costs and procurement, alongside your schedule. Switch between **Schedule** and **Bill of Quantities** from the header; the BoQ is its own full-page view.
+- **Spreadsheet grid** with a frozen first column and header, click-to-sort columns, a status filter, text search, and show/hide columns. Edit any cell inline; **Cost is calculated automatically** (Qty × Rate).
+- **Procurement lifecycle** on every line — Not ordered → Quoted → Ordered → Delivered — with the delivery date captured when you mark something delivered. Content edits never reset a line's status.
+- **Financials panel** — set a project budget and see, at a glance, what's actually been spent (Ordered + Delivered), what's still just quoted, what's left, and a colour-coded budget bar that turns red when you're over. Costs roll up by trade, expandable to the line items.
+- **Export** your BoQ to Excel (.xlsx, with live formulas) or LibreOffice (.ods).
+- The app is now the single source of truth for what's been ordered, delivered, by whom and when.
+
+UNDER THE HOOD
+- DB schema v10: new `boq_item` table (job-scoped) + per-job `budget`. New `Procurement` model + repo layer with a content/status write-guard. Eight new Tauri commands + an `export_boq` command (XLSX via `rust_xlsxwriter` with live formulas; ODS via LibreOffice).
+- New MCP read tool `list_boq` so Claude can answer "what's been ordered / delivered / outstanding" against the live schedule.
+- Frontend: top-level view switch (`store.activeView`), a hand-rolled grid (sticky frozen panes), and pure logic modules `boq-grid.ts` / `boq-financials.ts` with vitest coverage.
+
+—
+
 Blik Plan v1.9.2 — Task status no longer reverts on save or job-switch
 
 FIX
