@@ -1,3 +1,11 @@
+Blik Plan v1.10.1 — Bill of Quantities fixes
+
+FIX
+- The Bill of Quantities **delete-row button** now works. It was gated behind a native browser confirm dialog that doesn't run in the app's webview, so clicking × did nothing. Deleting a row is now a two-click confirm (click × → "Delete?" → click again).
+- **Financials → By sector** now expands. Clicking a trade (HVAC, GLAZING, …) drops down its line items; previously the expand state didn't update so nothing happened.
+
+—
+
 Blik Plan v1.10.0 — Bill of Quantities
 
 NEW
