@@ -52,6 +52,15 @@ def read_boq_rows(ods_path):
                 rep = int(c.get(f'{{{T}}}number-columns-repeated', '1'))
                 val = c.get(f'{{{OFFICE}}}value') or cell_text(c)
                 cells.extend([val] * min(rep, 50))
+            item0 = (cells[0] if cells else '').strip().upper()
+            # The sheet ends with an aggregates block: a "TRADE SUBTOTALS"
+            # marker, one bare-trade-name subtotal row per trade, then
+            # GRAND TOTAL / VAT rows. None of those are line items — stop here.
+            if item0 == 'TRADE SUBTOTALS':
+                break
+            # Defensive: also skip any stray total/VAT row if the sheet is reordered.
+            if 'GRAND TOTAL' in item0 or item0 == 'VAT 15%':
+                continue
             if any(x for x in cells):
                 rows.append(cells)
         return rows
