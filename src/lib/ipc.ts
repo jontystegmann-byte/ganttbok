@@ -159,3 +159,6 @@ export const deleteBoqItem   = (id: number)                 => invoke<void>('del
 export const setJobBudget    = (jobId: number, budget: number | null) =>
   invoke<void>('set_job_budget', { args: { job_id: jobId, budget } });
 export const getJobBudget    = (jobId: number)              => invoke<number | null>('get_job_budget', { jobId });
+
+export const exportBoq = (jobId: number, format: 'xlsx' | 'ods') =>
+  invoke<string>('export_boq', { jobId, format });
