@@ -73,7 +73,7 @@
   <div class="export">
     <button class="btn" onclick={() => (showExport = !showExport)}>⤓ Export ▾</button>
     {#if showExport}
-      <div class="menu">
+      <div class="export-menu">
         <button class="menu-btn" onclick={() => doExport('xlsx')}>Export .xlsx</button>
         <button class="menu-btn" onclick={() => doExport('ods')}>Export .ods</button>
       </div>
@@ -101,7 +101,7 @@
   .menu-row { display: flex; align-items: center; gap: var(--sp-2); padding: 3px 2px;
     font-size: var(--font-size-sm); color: var(--c-text); white-space: nowrap; }
   .export { position: relative; }
-  .menu { position: absolute; top: 110%; right: 0; z-index: 30; background: var(--c-panel);
+  .export-menu { position: absolute; top: 110%; right: 0; z-index: 30; background: var(--c-panel);
     border: 1px solid var(--c-border); border-radius: 6px; padding: var(--sp-1); box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
   .menu-btn { display: block; width: 100%; text-align: left; border: 0; background: transparent; color: var(--c-text);
     font: inherit; font-size: var(--font-size-sm); padding: var(--sp-1) var(--sp-2); cursor: pointer; white-space: nowrap; border-radius: 4px; }
