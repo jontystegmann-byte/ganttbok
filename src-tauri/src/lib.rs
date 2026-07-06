@@ -115,6 +115,14 @@ pub fn run() {
             commands::claude::detect_claude_surfaces,
             commands::claude::connect_to_claude,
             commands::claude::disconnect_from_claude,
+            commands::boq::list_boq_items,
+            commands::boq::create_boq_item,
+            commands::boq::update_boq_item,
+            commands::boq::set_boq_procurement,
+            commands::boq::reorder_boq_item,
+            commands::boq::delete_boq_item,
+            commands::boq::set_job_budget,
+            commands::boq::get_job_budget,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
