@@ -23,6 +23,22 @@
   </div>
 
   <div class="tools">
+    <div class="view-switch" role="tablist" aria-label="View">
+      <button
+        class="seg"
+        class:on={store.activeView === 'schedule'}
+        role="tab"
+        aria-selected={store.activeView === 'schedule'}
+        onclick={() => store.setView('schedule')}
+      >Schedule</button>
+      <button
+        class="seg"
+        class:on={store.activeView === 'boq'}
+        role="tab"
+        aria-selected={store.activeView === 'boq'}
+        onclick={() => store.setView('boq')}
+      >Bill of Quantities</button>
+    </div>
     <HeaderActions />
     <button class="tool-btn" onclick={() => (store.showPrintOptions = true)} title="Print">
       Print
@@ -78,4 +94,24 @@
     font-size: var(--font-size-sm);
   }
   .tool-btn:hover { background: var(--c-accent-fade); color: var(--c-accent); }
+  .view-switch {
+    display: inline-flex;
+    background: var(--c-accent-fade);
+    border-radius: 6px;
+    padding: 2px;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+  .seg {
+    border: 0;
+    background: transparent;
+    color: var(--c-text-muted);
+    font: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    padding: var(--sp-1) var(--sp-3);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .seg.on { background: var(--c-accent); color: #fff; }
 </style>
