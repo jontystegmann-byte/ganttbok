@@ -74,6 +74,7 @@ class Store {
 
   // Bill of Quantities line items for the open job.
   boqItems = $state<BoqItem[]>([]);
+  boqBudget = $state<number | null>(null);
 
   async toggleDurationUnit(): Promise<void> {
     this.durationUnit = this.durationUnit === 'weeks' ? 'days' : 'weeks';
@@ -98,6 +99,18 @@ class Store {
   async refreshBoqItems(): Promise<void> {
     if (!this.currentJob) { this.boqItems = []; return; }
     this.boqItems = await ipc.listBoqItems(this.currentJob.id);
+  }
+
+  async refreshBoqBudget(): Promise<void> {
+    if (!this.currentJob) { this.boqBudget = null; return; }
+    this.boqBudget = await ipc.getJobBudget(this.currentJob.id);
+  }
+
+  async setBoqBudget(budget: number | null): Promise<void> {
+    if (!this.currentJob) return;
+    await ipc.setJobBudget(this.currentJob.id, budget);
+    this.boqBudget = budget;
+    await ipc.touchLastSave();
   }
 
   async createBoqItem(): Promise<void> {
@@ -523,6 +536,7 @@ class Store {
     this.dependencies = await ipc.listDependencies(jobId);
     this.noWorkDays   = await ipc.listNoWorkDays(jobId);
     this.boqItems = await ipc.listBoqItems(jobId);
+    this.boqBudget = await ipc.getJobBudget(jobId);
     this.selection    = null;
     this.activeView = 'schedule';
     await ipc.setLastOpenJob(jobId);
